@@ -1,19 +1,14 @@
-# Cadastro e seguranca
+# Cadastro e segurança
 
-## Estado das definicoes
+## Identificação do passageiro
 
-O escopo informado confirma os módulos FairGo Passenger, FairGo Driver e FairGo Admin, mas não define campos de cadastro, verificações, autenticação, autorizações ou procedimentos de segurança. Este documento não introduz requisitos de cadastro como regras de negócio aprovadas.
+O passageiro deve anexar um documento de identidade. O nome real exibido ao motorista deve corresponder ao nome do documento apresentado.
 
-## Regras confirmadas
-
-- A plataforma está planejada para três módulos com os nomes Passenger, Driver e Admin.
-- Os detalhes de cadastro e os acessos associados a cada módulo ainda não foram especificados.
-
-## Pendencias para definicao
+## Pendências para definição
 
 Devem ser decididos antes de implementar os fluxos correspondentes:
 
-- Dados obrigatórios e opcionais para cada tipo de conta.
+- Demais dados obrigatórios e opcionais para cada tipo de conta.
 - Processo de criação, atualização, recuperação e encerramento de conta.
 - Verificação de identidade, contato ou documentos, incluindo escopo e responsáveis.
 - Métodos de autenticação e políticas de sessão e recuperação de acesso.

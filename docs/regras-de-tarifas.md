@@ -1,4 +1,3 @@
-:::writing{variant="standard" id="63182"}
 # FAIRGO — Regras de Tarifas e Remuneração
 
 ## 1. Tarifa mínima do passageiro
@@ -38,4 +37,3 @@
 
 ## Status
 Documento de especificação. Regras aprovadas e parâmetros em avaliação estão identificados separadamente. Não implementar parâmetros experimentais como regras definitivas.
-:::

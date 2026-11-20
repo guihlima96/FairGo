@@ -37,15 +37,19 @@ Essas tecnologias são escolhas planejadas. Este documento não define versões,
 
 ### 4.1 Tarifas
 
-Não há política de tarifas confirmada. Fórmulas, componentes de preço, taxas, descontos, moeda, estimativas e ajustes permanecem pendentes de decisão e aprovação.
+A tarifa mínima do passageiro é R$ 8,00 por corrida concluída. O motorista recebe no mínimo R$ 6,50 líquidos por corrida concluída e, nas corridas longas, pelo menos R$ 1,20 por quilômetro remunerável. O deslocamento até o passageiro entra no cálculo. A comissão varia de 8% a 20%, preservados os mínimos do motorista. Na compensação por congestionamento imprevisível elegível, passageiro e FAIRGO pagam metade cada, sem comissão. Os parâmetros de tempo em avaliação constam nas [regras de tarifas](docs/regras-de-tarifas.md).
 
 ### 4.2 Cancelamentos
 
-Não há política de cancelamento confirmada. Responsáveis, etapas permitidas, prazos, motivos, cobranças, reembolsos, notificações e tratamento de exceções permanecem pendentes.
+Antes do aceite, o passageiro que cancelar deve aguardar 1 minuto para solicitar outra corrida. Após o aceite e antes da chegada, a compensação é devida quando o motorista percorre mais de 50% do deslocamento previsto. Aplicam-se as cinco faixas aprovadas nas [regras de cancelamento](docs/regras-de-cancelamento.md) sobre os quilômetros efetivamente percorridos.
+
+No embarque, o cancelamento pelo passageiro gera R$ 4,00 para deslocamentos previstos de até 5 km ou compensação por quilometragem acima de 5 km. Soma-se a espera excedente de R$ 0,20 a partir de 1min30s e a cada minuto completo adicional. A espera máxima por ausência é de 5 minutos. O ressarcimento automático de pedágio exige passageiro embarcado e deslocamento ao destino.
+
+A plataforma acompanha aceitação e finalização. A redução de ofertas por cancelamentos do motorista após o aceite só se aplica acima de 30% de cancelamentos sem justificativa no mês vigente.
 
 ### 4.3 Cadastro e segurança
 
-Não foram definidos campos de cadastro, verificações, autenticação, recuperação de conta, permissões, tratamento de dados pessoais ou controles administrativos. A existência dos módulos Passenger, Driver e Admin não determina, por si só, esses detalhes.
+O passageiro anexa documento de identidade. O motorista vê o nome real do passageiro, compatível com o documento. Para o motorista, aplicam-se verificação de identidade, antecedentes criminais, exame toxicológico, CNH válida com EAR e CRLV. Os critérios de elegibilidade do veículo e as verificações constam em [cadastro e segurança](docs/cadastro-e-seguranca.md).
 
 ## 5. Decisões ainda necessárias
 
@@ -55,8 +59,8 @@ Antes de detalhar a arquitetura ou implementar os fluxos correspondentes, é nec
 - A estrutura interna do backend e os contratos de comunicação.
 - Os fluxos e permissões de cada módulo.
 - O modelo de dados e as políticas aplicáveis aos dados armazenados.
-- As regras de tarifas e cancelamentos.
-- O cadastro, a autenticação, a autorização e os requisitos de segurança e privacidade.
+- Os parâmetros de tarifa em avaliação e os pontos operacionais de cancelamento identificados nos documentos relacionados.
+- Os demais campos de cadastro, a autenticação, a autorização e os requisitos de segurança e privacidade.
 - A implantação, os ambientes, a observabilidade e os requisitos operacionais.
 
 Os pontos acima são uma lista de pendências, não propostas adotadas.
