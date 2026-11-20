@@ -23,3 +23,47 @@ Devem ser decididos antes de implementar os fluxos correspondentes:
 - Requisitos específicos para acesso administrativo e auditoria.
 
 Os itens acima são pendências de produto e engenharia, não controles já implementados nem regras definitivamente aprovadas. As decisões devem ser validadas e documentadas antes de orientar a implementação. A escolha de Java/Spring Boot, Flutter, PostgreSQL, REST e WebSocket, por si só, não determina como esses controles serão realizados.
+
+## Requisitos de habilitação e veículos — regras aprovadas
+
+### Documentação do motorista
+
+- O motorista deverá apresentar CNH válida com a observação EAR (Exerce Atividade Remunerada).
+- O motorista deverá anexar o CRLV do veículo.
+- A documentação deverá ser verificada antes da aprovação do cadastro.
+- Os requisitos anteriormente definidos de antecedentes criminais, exame toxicológico e verificação de identidade permanecem aplicáveis.
+
+### Requisitos mínimos do veículo
+
+- Possuir no mínimo quatro portas.
+- Possuir ar-condicionado.
+- Ter até 10 anos de uso, calculados pelo ano de fabricação.
+- Será permitido um ano adicional de operação, totalizando até 11 anos de uso.
+- Veículos com 12 anos ou mais não poderão realizar corridas.
+
+### Cálculo da idade do veículo
+
+Idade do veículo = ano atual - ano de fabricação.
+
+Exemplo para 2026:
+
+- Fabricado em 2016: 10 anos, permitido.
+- Fabricado em 2015: 11 anos, permitido no ano adicional.
+- Fabricado em 2014: 12 anos, não permitido.
+
+A elegibilidade será recalculada anualmente.
+
+Caso a legislação municipal estabeleça limites mais restritivos, deverão prevalecer as exigências legais aplicáveis.
+
+### Validação pelo sistema
+
+O FAIRGO deverá:
+
+1. Verificar a validade da CNH e a presença da observação EAR.
+2. Validar o CRLV e identificar o ano de fabricação.
+3. Verificar os requisitos mínimos do veículo.
+4. Calcular automaticamente a idade do veículo.
+5. Impedir a ativação de veículos que ultrapassem o limite permitido.
+6. Notificar o motorista antes do encerramento do período de elegibilidade.
+
+**Status:** requisitos aprovados para o FAIRGO, sujeitos à conformidade com a legislação aplicável.
