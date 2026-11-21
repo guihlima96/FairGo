@@ -2,7 +2,7 @@
 
 FairGo é uma plataforma de mobilidade urbana em planejamento. O projeto está sendo organizado em três módulos: FairGo Passenger, FairGo Driver e FairGo Admin.
 
-## Modulos planejados
+## Módulos planejados
 
 - **FairGo Passenger**: modulo voltado a passageiros.
 - **FairGo Driver**: modulo voltado a motoristas.
@@ -19,7 +19,7 @@ As funcionalidades, permissões e fluxos detalhados de cada módulo ainda precis
 
 Esta é a tecnologia planejada; a presença de implementações ou de uma arquitetura implantada ainda não está documentada neste repositório.
 
-## Documentacao
+## Documentação
 
 - [Especificação mestre do FairGo](FAIRGO_SPEC.md) — referência central para escopo, decisões confirmadas e pendências.
 - [Arquitetura](docs/arquitetura.md)
