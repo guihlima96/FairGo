@@ -38,3 +38,12 @@ CREATE TABLE IF NOT EXISTS decisoes_cadastro (
     responsavel text NOT NULL,
     data timestamptz NOT NULL DEFAULT clock_timestamp()
 );
+
+-- Amplia o conjunto de tipos admitidos sem remover evidências existentes.
+ALTER TABLE documentos_cadastro DROP CONSTRAINT IF EXISTS documentos_cadastro_check;
+ALTER TABLE documentos_cadastro ADD CONSTRAINT documentos_cadastro_check CHECK (
+    (tipo = 'CRLV' AND veiculo_id IS NOT NULL AND motorista_id IS NULL) OR
+    (tipo IN ('CNH','ANTECEDENTES','TOXICOLOGICO','FOTO_PERFIL','RESIDENCIA')
+        AND motorista_id IS NOT NULL AND veiculo_id IS NULL)
+);
+ALTER TABLE decisoes_cadastro ADD COLUMN IF NOT EXISTS revisoes_identidade uuid[];
