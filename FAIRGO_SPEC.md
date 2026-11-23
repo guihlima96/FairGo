@@ -49,7 +49,7 @@ A plataforma acompanha aceitação e finalização. A redução de ofertas por c
 
 ### 4.3 Cadastro e segurança
 
-O passageiro anexa documento de identidade. O motorista vê o nome real do passageiro, compatível com o documento. Para o motorista, aplicam-se verificação de identidade, antecedentes criminais, exame toxicológico, CNH válida com EAR e CRLV. Os critérios de elegibilidade do veículo e as verificações constam em [cadastro e segurança](docs/cadastro-e-seguranca.md).
+O passageiro anexa documento de identidade. O motorista vê o nome real do passageiro, compatível com o documento. O cadastro do motorista exige nome completo, celular ativo, e-mail e CPF. Nome e contatos passam por verificação. São obrigatórios CNH definitiva válida com EAR (PPD não aceita), CRLV atualizado, foto de perfil própria, comprovante de residência em nome do motorista, verificação de antecedentes criminais e exame toxicológico. Os critérios de elegibilidade do veículo e as verificações constam em [cadastro e segurança](docs/cadastro-e-seguranca.md).
 
 ## 5. Decisões ainda necessárias
 
