@@ -1,28 +1,37 @@
-# Contexto e Regras do Projeto
+# Orientações para trabalhar no FairGo
 
-## Stack Tecnológica
-- **Linguagem:** Java 17 (use Records para DTOs, Pattern Matching e recursos modernos do Java 17 quando adequado)
-- **Framework:** Spring Boot 3.x (Web, Data JPA, Validation)
-- **Build & Dependências:** Maven (`pom.xml`)
-- **Banco de Dados:** PostgreSQL
+## Arquitetura existente
 
-## Arquitetura e Padrões de Código
-- Organize o código em camadas claras: `controller`, `service`, `repository`, `domain` (ou `model`), `dto` e `exception`.
-- **Nunca exponha entidades JPA diretamente** nos Controllers; sempre utilize DTOs de entrada (Request) e saída (Response).
-- Utilize injeção de dependência via construtor (evite `@Autowired` direto em atributos).
-- Valide entradas usando Jakarta Validation (`@Valid`, `@NotNull`, `@NotBlank`, etc.) e trate erros de forma centralizada com `@RestControllerAdvice`.
+O backend em `backend/` usa Java 17, Spring Boot 3.5.7, Spring Web, Security e Validation. A persistência usa Spring JDBC com JdbcTemplate e SQL explícito em PostgreSQL. O Maven lê `backend/pom.xml`. O painel administrativo é servido pelo próprio backend em `/admin/index.html`.
 
-## Banco de Dados (PostgreSQL)
-- Respeite nomenclatura `snake_case` para tabelas e colunas no banco de dados.
-- Caso o projeto utilize Flyway ou Liquibase, sempre crie scripts de migration versionados para alterações de schema em vez de depender de `ddl-auto=update`.
-- **Segurança:** Nunca altere nem commite senhas reais em `application.properties` ou `application.yml`. Use variáveis de ambiente.
+Preserve os contratos REST e os DTOs existentes. Prefira injeção por construtor e valide as entradas no servidor. Mantenha a persistência em JDBC. Consulte `backend/src/main/resources/schema.sql` e `validacao.sql` antes de propor mudanças de dados. Preserve os registros existentes e use variáveis de ambiente para credenciais e chave do cofre.
 
-## Comandos Úteis (Maven)
-- **Compilar:** `./mvnw clean compile` (ou `mvn clean compile`)
-- **Rodar testes:** `./mvnw test` (ou `mvn test`)
-- **Empacotar:** `./mvnw clean package -DskipTests`
+## Build e testes
 
-## Fluxo de Trabalho (Modo Work)
-1. Antes de escrever código complexo, apresente um breve plano dos arquivos que serão criados ou alterados.
-2. Após implementar uma funcionalidade ou correção, sempre execute `mvn test` (ou compile o projeto) para garantir que não há erros de compilação ou testes quebrados.
-3. Mantenha commits atômicos e mensagens claras seguindo o padrão Conventional Commits (`feat:`, `fix:`, `refactor:`).
+Na raiz do repositório, com JDK 17 e Maven no PATH:
+
+```powershell
+mvn -f backend/pom.xml compile
+mvn -B -f backend/pom.xml verify
+```
+
+A fase `verify` inclui testes Maven e empacotamento. A validação da Etapa 4 também depende de duas suítes externas. Para reproduzi-las:
+
+1. Prepare PostgreSQL e psql com um banco descartável exclusivo terminado em `_test`. Configure as variáveis JDBC e a chave de documentos conforme o [guia do backend](backend/README.md). Inicie o servidor com `mvn -f backend/pom.xml spring-boot:run`.
+2. Em outro terminal, na raiz, aponte `PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER` e `PGPASSWORD` para o mesmo banco. Configure `PSQL` se necessário. Aguarde o painel responder. Use Python 3 em ambiente virtual e Chrome com driver compatível disponível para Selenium.
+3. Execute em sequência:
+
+```powershell
+$env:FAIRGO_TEST_URL = 'http://127.0.0.1:8080'
+python -m pip install selenium==4.29.0
+python backend/tests/test_validacao.py
+python backend/tests/test_painel.py
+```
+
+A primeira suíte exercita a API com PostgreSQL. A segunda opera o painel em Chrome com dados fictícios. O [workflow Admin](.github/workflows/admin.yml) reproduz a sequência no CI.
+
+## Fluxo de trabalho
+
+Consulte [FAIRGO_SPEC.md](FAIRGO_SPEC.md) para regras aprovadas. Registre propostas e pendências explicitamente. Antes de mudanças complexas, identifique os arquivos e contratos afetados. Trabalhe em branch própria, com commits focados no padrão Conventional Commits. Nas mudanças de backend ou painel, valide o build e ambas as suítes de regressão.
+
+O [plano da Etapa 5](docs/etapa-5-driver-admin.md) descreve a integração proposta para revisão.
