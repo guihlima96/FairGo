@@ -30,7 +30,7 @@ Os itens acima são pendências de produto e engenharia, não controles já impl
 - O motorista deverá anexar o CRLV atualizado do veículo.
 - A documentação deverá ser verificada antes da aprovação do cadastro.
 - A verificação de identidade e a de antecedentes criminais são obrigatórias. O exame toxicológico é facultativo nesta etapa. Sua ausência permite concluir a análise e aprovar o cadastro quando os requisitos obrigatórios forem atendidos.
-- Aceitar JPEG ou PDF para cada um destes documentos: CNH digital ou física, CRLV e comprovante de residência.
+- Aceitar JPEG ou PDF para cada um destes documentos: CNH digital ou física, CRLV e comprovante de residência. O comprovante de antecedentes criminais também poderá ser enviado em PDF.
 
 ### Requisitos mínimos do veículo
 
