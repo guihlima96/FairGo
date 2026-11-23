@@ -40,3 +40,7 @@ Testar também acesso cruzado entre dois motoristas, tentativa de autoaprovaçã
 ## Captura da foto pelo motorista
 
 Na etapa da foto, abrir a câmera e permitir tirar, revisar e refazer a foto antes do envio em JPEG. Se o acesso à câmera estiver indisponível, informar como tentar novamente. Não oferecer galeria nem seletor de arquivos nesse fluxo. Nos testes do aplicativo, conferir a captura, a nova tentativa e o caso de permissão negada. O endpoint administrativo atual recebe JPEG e a conferência visual pelo Admin não comprova a origem da imagem.
+
+## Autenticidade do documento digital
+
+A implementação atual guarda a cópia visual cifrada. A assinatura do arquivo recebido só poderá ser validada durante o envio, antes da conversão. Para uma revisão posterior, será necessário consultar o emissor com um QR code ou outro identificador legível, quando disponível, ou solicitar o original novamente. A escolha do provedor e a política de validação automática seguem pendentes.

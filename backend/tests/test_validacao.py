@@ -30,7 +30,7 @@ def call(path, status, data=None, method="GET", token=TOKEN, content_type="appli
         data = json.dumps(data).encode()
     request = urllib.request.Request(URL + "/api/admin/" + path, data, headers, method=method)
     try:
-        response = urllib.request.urlopen(request, timeout=10)
+        response = urllib.request.urlopen(request, timeout=25)
     except urllib.error.HTTPError as error:
         response = error
     with response:
@@ -57,7 +57,17 @@ def pdf_teste(paginas=1, catalogo=b""):
     filhos = b" ".join(f"{i + 3} 0 R".encode() for i in range(paginas))
     objetos = [b"<< /Type /Catalog /Pages 2 0 R " + catalogo + b" >>",
                b"<< /Type /Pages /Count " + str(paginas).encode() + b" /Kids [" + filhos + b"] >>"]
-    objetos.extend([b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 300] >>"] * paginas)
+    fonte, figura, conteudo = paginas + 3, paginas + 4, paginas + 5
+    pagina = (f"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] "
+              f"/Resources << /Font << /F1 {fonte} 0 R >> /XObject << /Im {figura} 0 R >> >> "
+              f"/Contents {conteudo} 0 R >>").encode()
+    objetos.extend([pagina] * paginas)
+    objetos.append(b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>")
+    objetos.append(f"<< /Type /XObject /Subtype /Image /Width 2 /Height 2 /ColorSpace /DeviceRGB "
+                   f"/BitsPerComponent 8 /Filter /DCTDecode /Length {len(JPEG)} >>\nstream\n".encode()
+                   + JPEG + b"\nendstream")
+    comandos = b"BT /F1 15 Tf 72 720 Td (Cadastro ficticio FairGo) Tj ET q 80 0 0 80 72 600 cm /Im Do Q"
+    objetos.append(f"<< /Length {len(comandos)} >>\nstream\n".encode() + comandos + b"\nendstream")
     dados = bytearray(b"%PDF-1.4\n")
     offsets = []
     for i, obj in enumerate(objetos, 1):
@@ -156,7 +166,7 @@ class Validacao(unittest.TestCase):
         id_veiculo = call("veiculos",201,payload,"POST")["id"]
         call("veiculos",409,payload,"POST")
         path = "validacao/VEICULO/" + id_veiculo
-        ids = [upload(path,"CRLV", image=pdf_teste())["id"]]
+        ids = [upload(path,"CRLV", image=pdf_teste(10))["id"]]
         decidir(path, ids, 422)
         ano = datetime.date.today().year
         for portas, ar, idade, cidade, status in [

@@ -8,6 +8,7 @@ import jakarta.validation.constraints.*;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.http.*;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
@@ -35,9 +36,11 @@ class ValidacaoAdmin {
     record Documento(UUID id, Tipo tipo, LocalDate validade, Boolean ear) {}
     private final JdbcTemplate db;
     private final Cofre cofre;
+    private final TransactionTemplate transacao;
     private static final ZoneId FUSO = ZoneId.of("America/Sao_Paulo");
 
-    ValidacaoAdmin(JdbcTemplate db, Cofre cofre) {
+    ValidacaoAdmin(JdbcTemplate db, Cofre cofre, TransactionTemplate transacao) {
+        this.transacao = transacao;
         this.db = db;
         this.cofre = cofre;
     }
@@ -65,21 +68,24 @@ class ValidacaoAdmin {
     }
 
     @PutMapping(value="/{alvo}/{id}/documentos/{tipo}", consumes="multipart/form-data")
-    @Transactional
     public Documento enviar(@PathVariable Alvo alvo, @PathVariable UUID id, @PathVariable Tipo tipo,
                     @RequestParam MultipartFile arquivo, @RequestParam(required=false) Boolean ear,
                     @RequestParam(required=false) LocalDate validade, Principal admin) {
         if ((tipo == Tipo.CRLV) != (alvo == Alvo.VEICULO)
                 || (tipo == Tipo.CNH) != (ear != null) || (tipo == Tipo.CNH && validade == null))
             throw new ResponseStatusException(BAD_REQUEST);
-        String anterior = estado(alvo, id, true);
-        UUID revisao = UUID.randomUUID();
-        db.update("INSERT INTO documentos_cadastro (id," + alvo.coluna + ",tipo,validade,ear,imagem_cifrada)"
-                + " VALUES (?,?,?,?,?,?) ON CONFLICT (" + alvo.coluna + ",tipo) DO UPDATE SET id=excluded.id,"
-                + " validade=excluded.validade,ear=excluded.ear,imagem_cifrada=excluded.imagem_cifrada",
-                revisao, id, tipo.name(), validade, ear, cofre.preparar(arquivo,id,tipo.name()));
-        reabrir(alvo, id, anterior, admin);
-        return new Documento(revisao, tipo, validade, ear);
+        estado(alvo, id, false);
+        var documento = cofre.preparar(arquivo, id, tipo.name());
+        return transacao.execute(status -> {
+            String anterior = estado(alvo, id, true);
+            UUID revisao = UUID.randomUUID();
+            db.update("INSERT INTO documentos_cadastro (id," + alvo.coluna + ",tipo,validade,ear,imagem_cifrada,formato)"
+                    + " VALUES (?,?,?,?,?,?,?) ON CONFLICT (" + alvo.coluna + ",tipo) DO UPDATE SET id=excluded.id,"
+                    + " validade=excluded.validade,ear=excluded.ear,imagem_cifrada=excluded.imagem_cifrada, formato=excluded.formato",
+                    revisao, id, tipo.name(), validade, ear, documento.cifrado(), documento.formato());
+            reabrir(alvo, id, anterior, admin);
+            return new Documento(revisao, tipo, validade, ear);
+        });
     }
 
     @GetMapping("/pendentes")
@@ -110,11 +116,11 @@ class ValidacaoAdmin {
     @GetMapping("/{alvo}/{id}/documentos/{revisao}")
     public ResponseEntity<byte[]> imagem(@PathVariable Alvo alvo, @PathVariable UUID id,
                               @PathVariable UUID revisao) throws GeneralSecurityException {
-        var rows = db.queryForList("SELECT tipo, imagem_cifrada FROM documentos_cadastro WHERE "
+        var rows = db.queryForList("SELECT tipo, formato, imagem_cifrada FROM documentos_cadastro WHERE "
                 + alvo.coluna + "=? AND id=?", id, revisao);
         if (rows.isEmpty()) throw new ResponseStatusException(NOT_FOUND);
         var row = rows.get(0);
-        byte[] dados = cofre.abrir((byte[]) row.get("imagem_cifrada"), id, (String) row.get("tipo"));
+        byte[] dados = cofre.abrir((byte[]) row.get("imagem_cifrada"), id, (String) row.get("tipo"), (String) row.get("formato"));
         boolean pdf = Cofre.pdf(dados);
         return ResponseEntity.ok().cacheControl(CacheControl.noStore())
                 .contentType(pdf ? MediaType.APPLICATION_PDF : MediaType.IMAGE_JPEG)

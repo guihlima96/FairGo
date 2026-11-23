@@ -49,6 +49,9 @@ DO 'BEGIN
         AND motorista_id IS NOT NULL AND veiculo_id IS NULL)
 );
     END IF;
+    IF NOT EXISTS (SELECT FROM pg_attribute WHERE attrelid=''documentos_cadastro''::regclass AND attname=''formato'' AND NOT attisdropped) THEN
+        ALTER TABLE documentos_cadastro ADD COLUMN formato text CHECK (formato IN (''PDF'',''JPEG''));
+    END IF;
     IF EXISTS (SELECT FROM pg_attribute WHERE attrelid=''decisoes_cadastro''::regclass AND attname=''revisoes_identidade'' AND NOT attisdropped) THEN
         ALTER TABLE decisoes_cadastro RENAME COLUMN revisoes_identidade TO revisoes_conferidas;
     ELSIF NOT EXISTS (SELECT FROM pg_attribute WHERE attrelid=''decisoes_cadastro''::regclass AND attname=''revisoes_conferidas'' AND NOT attisdropped) THEN

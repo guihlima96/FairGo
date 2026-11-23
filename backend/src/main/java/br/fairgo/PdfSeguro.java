@@ -11,6 +11,7 @@ import org.apache.pdfbox.pdmodel.graphics.image.JPEGFactory;
 import org.apache.pdfbox.rendering.*;
 
 public final class PdfSeguro {
+    private static final int LIMITE = 4 * 1024 * 1024;
     private static final Semaphore VAGAS = new Semaphore(2);
     static byte[] converter(byte[] dados) throws IOException {
         if (!VAGAS.tryAcquire()) throw new org.springframework.web.server.ResponseStatusException(
@@ -23,38 +24,54 @@ public final class PdfSeguro {
     }
 
     private static byte[] executar(byte[] dados) throws IOException {
-        var pasta = Files.createTempDirectory("fairgo-pdf-");
-        var entrada = pasta.resolve("entrada.pdf");
-        var saida = pasta.resolve("leitura.pdf");
-        Process processo = null;
+        String classe = PdfSeguro.class.getName();
+        boolean jar = PdfSeguro.class.getResource("PdfSeguro.class").toString().contains("BOOT-INF/");
+        var pb = new ProcessBuilder(Path.of(System.getProperty("java.home"), "bin", "java").toString(),
+                "-Xmx160m", "-XX:MaxDirectMemorySize=16m", "-Djava.awt.headless=true",
+                "-Dloader.main=" + classe, "-cp", System.getProperty("java.class.path"),
+                jar ? "org.springframework.boot.loader.launch.PropertiesLauncher" : classe);
+        pb.redirectError(ProcessBuilder.Redirect.DISCARD);
+        pb.environment().keySet().removeIf(k -> !Set.of("SYSTEMROOT","WINDIR","TMP","TEMP","LANG").contains(k.toUpperCase(Locale.ROOT)));
+        Process processo = pb.start();
+        var io = Executors.newFixedThreadPool(2);
         try {
-            Files.write(entrada, dados);
-            String classe = PdfSeguro.class.getName();
-            boolean jar = PdfSeguro.class.getResource("PdfSeguro.class").toString().contains("BOOT-INF/");
-            var pb = new ProcessBuilder(Path.of(System.getProperty("java.home"), "bin", "java").toString(),
-                    "-Xmx160m", "-XX:MaxDirectMemorySize=16m", "-Djava.awt.headless=true",
-                    "-Dloader.main=" + classe, "-cp", System.getProperty("java.class.path"),
-                    jar ? "org.springframework.boot.loader.launch.PropertiesLauncher" : classe,
-                    entrada.toString(), saida.toString());
-            pb.redirectOutput(ProcessBuilder.Redirect.DISCARD).redirectError(ProcessBuilder.Redirect.DISCARD);
-            pb.environment().keySet().removeIf(k -> !Set.of("SYSTEMROOT","WINDIR","TMP","TEMP","LANG").contains(k.toUpperCase(Locale.ROOT)));
-            processo = pb.start();
-            if (!processo.waitFor(15, TimeUnit.SECONDS) || processo.exitValue() != 0
-                    || Files.size(saida) > 4194304) throw new IOException("PDF fora dos limites");
-            return Files.readAllBytes(saida);
+            var envio = io.submit(() -> {
+                try (var destino = processo.getOutputStream()) {
+                    destino.write(dados);
+                }
+                return null;
+            });
+            var leitura = io.submit(() -> {
+                try (var origem = processo.getInputStream()) {
+                    return origem.readNBytes(LIMITE + 1);
+                }
+            });
+            if (!processo.waitFor(15, TimeUnit.SECONDS)) throw new IOException("Tempo de conversão excedido");
+            if (processo.exitValue() == 2) throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.PAYLOAD_TOO_LARGE, "Cópia visual acima de 4 MiB");
+            if (processo.exitValue() != 0) throw new IOException("PDF inválido");
+            envio.get();
+            byte[] copia = leitura.get();
+            if (copia.length > LIMITE || !Cofre.pdf(copia)) throw new IOException("Saída inválida");
+            return copia;
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new IOException(e);
+        } catch (ExecutionException e) {
+            throw new IOException(e.getCause());
         } finally {
-            if (processo != null && processo.isAlive()) processo.destroyForcibly().onExit().join();
-            Files.deleteIfExists(saida);
-            Files.deleteIfExists(entrada);
-            Files.deleteIfExists(pasta);
+            if (processo.isAlive()) processo.destroyForcibly().onExit().join();
+            io.shutdownNow();
         }
     }
 
     public static void main(String[] args) throws IOException {
-        try (var original = Loader.loadPDF(new File(args[0])); var limpo = new PDDocument()) {
+        var saida = System.out;
+        System.setOut(System.err);
+        javax.imageio.ImageIO.setUseCache(false);
+        byte[] entrada = System.in.readNBytes(LIMITE + 1);
+        if (entrada.length > LIMITE) throw new IOException();
+        try (var original = Loader.loadPDF(entrada); var limpo = new PDDocument()) {
             int paginas = original.getNumberOfPages();
             if (original.isEncrypted() || paginas < 1 || paginas > 10) throw new IOException();
             var renderer = new PDFRenderer(original);
@@ -72,7 +89,11 @@ public final class PdfSeguro {
                     imagem.flush();
                 }
             }
-            limpo.save(args[1]);
+            var bytes = new ByteArrayOutputStream();
+            limpo.save(bytes);
+            if (bytes.size() > LIMITE) System.exit(2);
+            bytes.writeTo(saida);
+            saida.flush();
         }
     }
 }
