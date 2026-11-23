@@ -41,6 +41,7 @@ class Driver(unittest.TestCase):
     def setUpClass(cls):
         if not os.environ["PGDATABASE"].endswith("_test"):
             raise RuntimeError("Use banco exclusivo com sufixo _test")
+        sql("DELETE FROM limites_driver")
 
     def criar(self, dados):
         status, conta = api("POST", "/api/driver/contas", dados)
@@ -65,7 +66,9 @@ class Driver(unittest.TestCase):
         for sessao, titular in ((token, ida), (outro, idb)):
             status, me = api("GET", "/api/driver/me?id=" + idb, token=sessao)
             self.assertEqual((status, me["id"], me["situacao"]), (200, titular, "PENDENTE"))
-            self.assertFalse(any(me[k] for k in ("email_verificado","nome_verificado","celular_verificado")))
+            self.assertEqual(set(me), {"id", "nome", "email", "situacao", "cpf", "celular",
+                                       "nomeVerificado", "emailVerificado", "celularVerificado"})
+            self.assertFalse(any(me[k] for k in ("emailVerificado", "nomeVerificado", "celularVerificado")))
             self.assertNotIn("senha_hash", me)
         self.assertEqual(api("GET", "/api/driver/me")[0], 401)
         self.assertEqual(api("GET", "/api/admin/validacao/pendentes", token=token)[0], 401)

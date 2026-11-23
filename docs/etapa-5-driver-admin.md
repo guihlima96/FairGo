@@ -53,7 +53,7 @@ Prefixo `/api/driver`. Requisições e respostas com corpo usam JSON. Clientes d
 |---|---|---|
 | POST /contas | nome, cpf, celular, email, senha | 201 com id e situacao=PENDENTE. Dados inválidos retornam 400. CPF ou e-mail duplicado retorna 409 sem identificar o campo. |
 | POST /sessoes | identificador (e-mail ou UUID) e senha | 200 com token e expiraEm. Falha de credencial retorna 401 e limite de tentativas retorna 429. |
-| GET /me | Bearer Driver | 200 com dados do próprio perfil, situação e indicadores de verificação. Sessão inválida retorna 401. |
+| GET /me | Bearer Driver | 200 com id, nome, email, situacao, cpf, celular e os booleanos nomeVerificado, emailVerificado e celularVerificado. Sessão inválida retorna 401. |
 | DELETE /sessoes/atual | Bearer Driver | 204. Revoga a sessão apresentada. |
 | POST /recuperacao | email | 202 vazio para qualquer endereço sintaticamente válido. Nesta entrega nenhum token é emitido e nenhuma mensagem é enviada. |
 | POST /recuperacao/confirmacao | token e novaSenha | 204 ao consumir uma credencial válida associada a e-mail verificado. Token inválido, expirado ou consumido retorna 400. A troca revoga todas as sessões. |

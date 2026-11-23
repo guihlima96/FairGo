@@ -27,6 +27,8 @@ class ContaDriver {
     record Redefinicao(@NotNull @Pattern(regexp="rec_[0-9a-f]{64}") String token,
                        @NotBlank @Size(min=15,max=128) String novaSenha) {}
     record Credencial(UUID id, String hash) {}
+    record MinhaConta(UUID id, String nome, String email, String situacao, String cpf, String celular,
+                      boolean nomeVerificado, boolean emailVerificado, boolean celularVerificado) {}
     record Sessao(String token, Instant expiraEm) {}
 
     private final JdbcTemplate db;
@@ -113,11 +115,14 @@ class ContaDriver {
     }
 
     @GetMapping("/me")
-    public Map<String,Object> minhaConta(Principal titular) {
-        return db.queryForMap("""
+    public MinhaConta minhaConta(Principal titular) {
+        return db.queryForObject("""
                 SELECT u.id,u.nome,u.email,u.situacao,c.cpf,c.celular,c.nome_verificado,c.email_verificado,c.celular_verificado
                 FROM usuarios u JOIN contas_driver c ON c.usuario_id=u.id WHERE u.id=?
-                """, UUID.fromString(titular.getName()));
+                """, (rs, n) -> new MinhaConta(rs.getObject("id", UUID.class), rs.getString("nome"),
+                        rs.getString("email"), rs.getString("situacao"), rs.getString("cpf"), rs.getString("celular"),
+                        rs.getBoolean("nome_verificado"), rs.getBoolean("email_verificado"), rs.getBoolean("celular_verificado")),
+                UUID.fromString(titular.getName()));
     }
 
     @DeleteMapping("/sessoes/atual")
