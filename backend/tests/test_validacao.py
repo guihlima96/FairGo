@@ -53,9 +53,26 @@ def upload(path, tipo, fields=None, image=JPEG, status=200):
                 content_type="multipart/form-data; boundary=" + boundary)
 
 
-def decidir(path, ids, status, resultado="APROVADO"):
+def pdf_teste():
+    objetos = [b"<< /Type /Catalog /Pages 2 0 R >>",
+               b"<< /Type /Pages /Count 1 /Kids [3 0 R] >>",
+               b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 300] >>"]
+    dados = bytearray(b"%PDF-1.4\n")
+    offsets = []
+    for i, obj in enumerate(objetos, 1):
+        offsets.append(len(dados))
+        dados.extend(f"{i} 0 obj\n".encode() + obj + b"\nendobj\n")
+    inicio = len(dados)
+    dados.extend(b"xref\n0 4\n0000000000 65535 f \n")
+    for offset in offsets:
+        dados.extend(f"{offset:010d} 00000 n \n".encode())
+    dados.extend(f"trailer\n<< /Size 4 /Root 1 0 R >>\nstartxref\n{inicio}\n%%EOF\n".encode())
+    return bytes(dados)
+
+
+def decidir(path, ids, status, resultado="APROVADO", identidade=True):
     call(path + "/decisoes", status, {"situacao": resultado, "motivo": "Conferência manual de teste",
-                                      "documentosConferidos": ids}, "POST")
+                                      "identidadeConferida": identidade, "documentosConferidos": ids}, "POST")
 
 
 class Validacao(unittest.TestCase):
@@ -98,7 +115,13 @@ class Validacao(unittest.TestCase):
         decidir(path, [], 422)
         upload(path, "CNH", status=400)
         upload(path, "ANTECEDENTES", image=b"conteudo invalido", status=400)
-        ids = [upload(path, tipo)["id"] for tipo in ("ANTECEDENTES", "TOXICOLOGICO")]
+        upload(path, "FOTO_PERFIL", image=pdf_teste(), status=400)
+        upload(path, "RESIDENCIA", image=b"%PDF-invalido", status=400)
+        ids = [upload(path, "FOTO_PERFIL")["id"]]
+        for tipo in ("ANTECEDENTES", "RESIDENCIA"):
+            revisao = upload(path, tipo, image=pdf_teste())["id"]
+            self.assertEqual(call(path + "/documentos/" + revisao, 200), pdf_teste())
+            ids.append(revisao)
         for ear, validade in [("false","2099-01-01"), ("true","2000-01-01")]:
             cnh = upload(path,"CNH",{"ear":ear,"validade":validade})["id"]
             decidir(path, ids + [cnh], 422)
@@ -107,6 +130,8 @@ class Validacao(unittest.TestCase):
         self.assertTrue(call(path + "/documentos/" + cnh, 200).startswith(b"\xff\xd8"))
         self.assertFalse(sql(f"SELECT encode(imagem_cifrada,'hex') FROM documentos_cadastro WHERE id='{cnh}'").startswith("ffd8"))
         decidir(path, ids + [str(uuid.uuid4())], 422)
+        decidir(path, ids + [cnh], 422, identidade=False)
+        decidir(path, [ids[0], ids[2], cnh], 422)
         decidir(path, ids + [cnh], 201)
         decidir(path, ids + [cnh], 409)
         history = call(path + "/historico", 200)
