@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="pt-BR">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FairGo Admin</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f2f4f8;color:#192d46;font:1rem/1.55 "Segoe UI",sans-serif}main{max-width:48rem;margin:auto;padding:2rem 1rem}form,section{background:white;border:1px solid #cbd3df;border-radius:.75rem;padding:1.25rem;margin-bottom:1rem}label{display:block;margin-bottom:1rem}input,select,button{font:inherit;padding:.5rem;border:1px solid #728298;border-radius:.35rem}input,select{display:block;width:100%}button{background:#203d63;color:white;cursor:pointer}li{overflow-wrap:anywhere}
+</style>
+<main>
+<h1>FairGo Admin</h1>
+<form id="consulta">
+<h2>Consultar cadastro</h2>
+<label>Token administrativo<input id="token" type="password" autocomplete="off" required></label>
+<label>Tipo de cadastro<select id="tipo"><option value="MOTORISTA">Motorista</option><option value="VEICULO">Veículo</option></select></label>
+<label>ID do cadastro<input id="codigo" required pattern="[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}"></label>
+<button>Consultar</button> <button type="reset">Limpar</button>
+</form>
+<p id="aviso" role="status"></p>
+<section id="resultado" hidden>
+<h2 id="situacao"></h2>
+<h3>Documentos cadastrados</h3><ul id="documentos"></ul>
+<h3>Histórico de decisões</h3><ul id="historico"></ul>
+</section>
+</main>
+<script src="painel.js"></script>
+</html>
