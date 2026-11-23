@@ -82,6 +82,17 @@ class ValidacaoAdmin {
         return new Documento(revisao, tipo, validade, ear);
     }
 
+    @GetMapping("/pendentes")
+    public List<Map<String,Object>> pendentes() {
+        return db.queryForList("""
+                SELECT id, 'MOTORISTA' AS tipo, nome AS descricao FROM usuarios
+                WHERE perfil='MOTORISTA' AND situacao='PENDENTE'
+                UNION ALL
+                SELECT id, 'VEICULO' AS tipo, placa AS descricao FROM veiculos WHERE situacao='PENDENTE'
+                ORDER BY tipo, descricao, id
+                """);
+    }
+
     @GetMapping("/{alvo}/{id}")
     public Map<String,Object> consultar(@PathVariable Alvo alvo, @PathVariable UUID id) {
         return Map.of("situacao",estado(alvo,id,false), "documentos",documentos(alvo,id),

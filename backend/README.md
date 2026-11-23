@@ -81,3 +81,9 @@ A conferência é manual. Autenticidade, suspensão de CNH, situação oficial d
 O workflow Testes do FairGo Admin executa Maven e a suíte HTTP em cada push e pull request, usando PostgreSQL descartável e uma chave de documentos gerada para a execução. A aba Actions mostra os resultados.
 
 Com o backend iniciado, abra http://127.0.0.1:8080/admin/index.html. Informe o token individual do administrador, o tipo e o UUID do cadastro. A consulta mostra situação, documentos cadastrados e histórico. Limpar encerra a consulta e remove o token do formulário.
+
+### Análise de pendências
+
+Informe o token e clique em **Carregar pendentes**. A fila identifica motoristas pelo nome e veículos pela placa. Selecione o cadastro e abra os documentos para conferência. A imagem fica disponível dentro da página durante a análise. Para aprovar, marque os documentos conferidos. Para ambas as decisões, informe uma justificativa e confirme. A fila, a situação e o histórico são recarregados após a decisão. Cadastros já decididos continuam disponíveis em **Consultar por ID**.
+
+O GitHub Actions também executa tests/test_painel.py em Chrome com cadastros e JPEG fictícios no banco exclusivo da suíte. O teste simula rejeição de motorista e aprovação de veículo.
