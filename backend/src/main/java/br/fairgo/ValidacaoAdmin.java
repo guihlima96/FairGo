@@ -26,12 +26,12 @@ class ValidacaoAdmin {
             this.filtro = filtro;
         }
     }
-    enum Tipo { CNH, ANTECEDENTES, TOXICOLOGICO, CRLV }
+    enum Tipo { CNH, ANTECEDENTES, TOXICOLOGICO, FOTO_PERFIL, RESIDENCIA, CRLV }
     enum Resultado { APROVADO, REJEITADO }
     record Dados(@Min(1) @Max(20) int portas, @NotNull Boolean arCondicionado,
                  @Min(1886) int anoFabricacao, @NotNull @Pattern(regexp="[0-9]{7}") String municipio) {}
     record Decisao(@NotNull Resultado situacao, @NotBlank @Size(max=500) String motivo,
-                   @Size(max=4) Set<UUID> documentosConferidos) {}
+                   Boolean identidadeConferida, @Size(max=5) Set<UUID> documentosConferidos) {}
     record Documento(UUID id, Tipo tipo, LocalDate validade, Boolean ear) {}
     private final JdbcTemplate db;
     private final Cofre cofre;
@@ -95,7 +95,7 @@ class ValidacaoAdmin {
 
     @GetMapping("/{alvo}/{id}")
     public Map<String,Object> consultar(@PathVariable Alvo alvo, @PathVariable UUID id) {
-        return Map.of("situacao",estado(alvo,id,false), "documentos",documentos(alvo,id),
+        return Map.of("nomeMotorista", alvo == Alvo.MOTORISTA ? db.queryForObject("SELECT nome FROM usuarios WHERE id=?",String.class,id) : "", "situacao",estado(alvo,id,false), "documentos",documentos(alvo,id),
                 "dadosVeiculo", alvo == Alvo.VEICULO ? db.queryForList(
                 "SELECT portas, ar_condicionado, ano_fabricacao, municipio FROM dados_veiculo WHERE veiculo_id=?",id) : List.of());
     }
@@ -113,9 +113,12 @@ class ValidacaoAdmin {
                 + alvo.coluna + "=? AND id=?", id, revisao);
         if (rows.isEmpty()) throw new ResponseStatusException(NOT_FOUND);
         var row = rows.get(0);
-        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).contentType(MediaType.IMAGE_JPEG)
-                .header("Content-Disposition","attachment; filename=documento.jpg")
-                .body(cofre.abrir((byte[]) row.get("imagem_cifrada"), id, (String) row.get("tipo")));
+        byte[] dados = cofre.abrir((byte[]) row.get("imagem_cifrada"), id, (String) row.get("tipo"));
+        boolean pdf = Cofre.pdf(dados);
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .contentType(pdf ? MediaType.APPLICATION_PDF : MediaType.IMAGE_JPEG)
+                .header("Content-Disposition", pdf ? "attachment; filename=documento.pdf" : "attachment; filename=documento.jpg")
+                .body(dados);
     }
 
     @PostMapping("/{alvo}/{id}/decisoes")
@@ -126,16 +129,26 @@ class ValidacaoAdmin {
         if (!estado(alvo,id,true).equals("PENDENTE")) throw new ResponseStatusException(CONFLICT);
         if (decisao.situacao() == Resultado.APROVADO) {
             var docs = documentos(alvo,id);
-            int exigidos = alvo == Alvo.MOTORISTA ? 3 : 1;
-            if (docs.size() != exigidos || decisao.documentosConferidos() == null
-                    || decisao.documentosConferidos().size() != exigidos
-                    || docs.stream().anyMatch(d -> !decisao.documentosConferidos().contains(d.id())
-                    || Boolean.FALSE.equals(d.ear())
-                    || (d.validade() != null && d.validade().isBefore(LocalDate.now(FUSO)))))
+            var exigidos = alvo == Alvo.MOTORISTA
+                    ? EnumSet.of(Tipo.CNH, Tipo.ANTECEDENTES, Tipo.FOTO_PERFIL, Tipo.RESIDENCIA)
+                    : EnumSet.of(Tipo.CRLV);
+            var conferidos = decisao.documentosConferidos();
+            var atuais = docs.stream().map(Documento::id).toList();
+            if (conferidos == null || !atuais.containsAll(conferidos)
+                    || (alvo == Alvo.MOTORISTA && !Boolean.TRUE.equals(decisao.identidadeConferida())))
                 throw new ResponseStatusException(UNPROCESSABLE_ENTITY);
+            for (Documento doc : docs) {
+                if (!exigidos.remove(doc.tipo())) continue;
+                if (!conferidos.contains(doc.id()) || Boolean.FALSE.equals(doc.ear())
+                        || (doc.validade() != null && doc.validade().isBefore(LocalDate.now(FUSO))))
+                    throw new ResponseStatusException(UNPROCESSABLE_ENTITY);
+            }
+            if (!exigidos.isEmpty()) throw new ResponseStatusException(UNPROCESSABLE_ENTITY);
             if (alvo == Alvo.VEICULO && !veiculoElegivel(id)) throw new ResponseStatusException(UNPROCESSABLE_ENTITY);
         }
-        registrar(alvo,id,decisao.situacao().name(),decisao.motivo().strip(),admin);
+        registrar(alvo,id,decisao.situacao().name(),decisao.motivo().strip(),admin,
+                alvo == Alvo.MOTORISTA && decisao.situacao() == Resultado.APROVADO
+                        ? decisao.documentosConferidos().toArray(UUID[]::new) : null);
     }
 
     private boolean veiculoElegivel(UUID id) {
@@ -147,19 +160,19 @@ class ValidacaoAdmin {
     }
 
     private void reabrir(Alvo alvo, UUID id, String anterior, Principal admin) {
-        if (!anterior.equals("PENDENTE")) registrar(alvo,id,"PENDENTE","Cadastro atualizado",admin);
+        if (!anterior.equals("PENDENTE")) registrar(alvo,id,"PENDENTE","Cadastro atualizado",admin,null);
     }
 
-    private void registrar(Alvo alvo, UUID id, String status, String motivo, Principal admin) {
+    private void registrar(Alvo alvo, UUID id, String status, String motivo, Principal admin, UUID[] revisoes) {
         db.update("UPDATE " + alvo.tabela + " SET situacao=? WHERE id=?", status, id);
-        db.update("INSERT INTO decisoes_cadastro (" + alvo.coluna + ",situacao,motivo,responsavel) VALUES (?,?,?,?)",
-                id,status,motivo,admin.getName());
+        db.update("INSERT INTO decisoes_cadastro (" + alvo.coluna + ",situacao,motivo,responsavel,revisoes_identidade) VALUES (?,?,?,?,?)",
+                id,status,motivo,admin.getName(),revisoes);
     }
 
     @GetMapping("/{alvo}/{id}/historico")
     public List<Map<String,Object>> historico(@PathVariable Alvo alvo, @PathVariable UUID id) {
         estado(alvo,id,false);
-        return db.queryForList("SELECT sequencia,situacao,motivo,responsavel,data FROM decisoes_cadastro WHERE "
+        return db.queryForList("SELECT sequencia,situacao,motivo,responsavel,data,to_json(revisoes_identidade)::text AS revisoes_identidade FROM decisoes_cadastro WHERE "
                 + alvo.coluna + "=? ORDER BY sequencia",id);
     }
 }
