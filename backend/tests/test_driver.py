@@ -81,6 +81,22 @@ class Driver(unittest.TestCase):
             self.login(a["email"], "senha incorreta", 401)
         self.login(ida, a["senha"], 429)
 
+    def test_concorrencia_e_legado(self):
+        dados = cadastro()
+        def solicitar(_):
+            return api("POST", "/api/driver/contas", dados)[0]
+        with concurrent.futures.ThreadPoolExecutor(2) as pool:
+            self.assertEqual(sorted(pool.map(solicitar, range(2))), [201,409])
+        tentativa = dict(cadastro(), cpf=dados["cpf"])
+        self.assertEqual(api("POST", "/api/driver/contas", tentativa)[0], 409)
+        self.assertEqual(sql(f"SELECT count(*) FROM usuarios WHERE email='{tentativa['email']}'"), "0")
+        legado = cadastro()
+        id_legado = uuid.uuid4()
+        sql(f"INSERT INTO usuarios(id,nome,email,perfil) "
+            f"VALUES ('{id_legado}','Pessoa Legada','{legado['email']}','MOTORISTA')")
+        self.assertEqual(api("POST", "/api/driver/contas", legado)[0], 409)
+        self.assertEqual(sql(f"SELECT count(*) FROM contas_driver WHERE usuario_id='{id_legado}'"), "0")
+
     def test_recuperacao(self):
         a = cadastro()
         usuario = self.criar(a)
