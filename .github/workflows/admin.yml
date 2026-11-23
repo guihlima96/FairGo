@@ -1,0 +1,49 @@
+name: Testes do FairGo Admin
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  integracao:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: fairgo_test
+          POSTGRES_USER: fairgo_ci
+          POSTGRES_PASSWORD: local_ci
+        ports: ['5432:5432']
+        options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      PGDATABASE: fairgo_test
+      PGUSER: fairgo_ci
+      PGPASSWORD: local_ci
+      PGHOST: 127.0.0.1
+      FAIRGO_DB_URL: jdbc:postgresql://127.0.0.1:5432/fairgo_test
+      FAIRGO_DB_USER: fairgo_ci
+      FAIRGO_DB_PASSWORD: local_ci
+      FAIRGO_TEST_URL: http://127.0.0.1:8080
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+      - run: mvn -B verify
+      - name: Iniciar backend e testar a API
+        run: |
+          export FAIRGO_DOCUMENT_KEY=$(openssl rand -base64 32)
+          java -jar target/backend-*.jar > "$RUNNER_TEMP/backend.log" 2>&1 &
+          pid=$!
+          trap 'kill "$pid" 2>/dev/null || true' EXIT
+          for tentativa in {1..60}; do
+            if ! kill -0 "$pid"; then cat "$RUNNER_TEMP/backend.log"; exit 1; fi
+            if curl -fsS "$FAIRGO_TEST_URL/admin/index.html" >/dev/null; then break; fi
+            sleep 1
+          done
+          python3 tests/test_validacao.py

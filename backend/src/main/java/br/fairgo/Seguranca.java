@@ -47,7 +47,8 @@ class Seguranca {
                 .requestCache(c -> c.disable())
                 .addFilterBefore(bearer, AnonymousAuthenticationFilter.class)
                 .exceptionHandling(c -> c.authenticationEntryPoint((req,res,e) -> res.setStatus(401)))
-                .authorizeHttpRequests(a -> a.dispatcherTypeMatchers(DispatcherType.ERROR).permitAll().requestMatchers("/api/admin/**").hasRole("ADMIN")
+                .authorizeHttpRequests(a -> a.dispatcherTypeMatchers(DispatcherType.ERROR).permitAll().requestMatchers("/admin/index.html", "/admin/painel.js").permitAll()
+                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .anyRequest().denyAll()).build();
     }
 

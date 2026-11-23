@@ -75,3 +75,9 @@ Imagens ficam em PostgreSQL como bytes cifrados com AES-256-GCM, nonce aleatóri
 Em produção use HTTPS, banco em rede privada, cofre de segredos e backup testado. Aplique schema.sql e validacao.sql com credencial de migração e defina SPRING_SQL_INIT_MODE=never na aplicação. Conceda à conta da API SELECT em credenciais_admin e limites_municipais, SELECT/INSERT em decisoes_cadastro, uso na sequência e apenas as permissões de leitura e gravação necessárias nas tabelas de cadastro. Restrinja provisionamento e alteração do histórico a funções operacionais separadas.
 
 A conferência é manual. Autenticidade, suspensão de CNH, situação oficial de CRLV, emissão de antecedentes e confirmação do laudo dependem de consulta ao emissor ou de integração autorizada. Também ficam para operação posterior atualização oficial por município, antivírus externo, política de retenção e revalidação anual agendada. O status reflete a última decisão registrada.
+
+## Testes automáticos e painel
+
+O workflow Testes do FairGo Admin executa Maven e a suíte HTTP em cada push e pull request, usando PostgreSQL descartável e uma chave de documentos gerada para a execução. A aba Actions mostra os resultados.
+
+Com o backend iniciado, abra http://127.0.0.1:8080/admin/index.html. Informe o token individual do administrador, o tipo e o UUID do cadastro. A consulta mostra situação, documentos cadastrados e histórico. Limpar encerra a consulta e remove o token do formulário.
