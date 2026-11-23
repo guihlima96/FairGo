@@ -29,7 +29,8 @@ Os itens acima são pendências de produto e engenharia, não controles já impl
 - O motorista deverá apresentar CNH definitiva e válida (PPD não aceita) com a observação EAR (Exerce Atividade Remunerada).
 - O motorista deverá anexar o CRLV atualizado do veículo.
 - A documentação deverá ser verificada antes da aprovação do cadastro.
-- Os requisitos anteriormente definidos de antecedentes criminais, exame toxicológico e verificação de identidade permanecem aplicáveis.
+- A verificação de identidade e a de antecedentes criminais são obrigatórias. O exame toxicológico é facultativo nesta etapa. Sua ausência permite concluir a análise e aprovar o cadastro quando os requisitos obrigatórios forem atendidos.
+- Aceitar JPEG ou PDF para cada um destes documentos: CNH digital ou física, CRLV e comprovante de residência.
 
 ### Requisitos mínimos do veículo
 
