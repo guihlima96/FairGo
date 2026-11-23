@@ -7,6 +7,9 @@ let ocupado = false;
 
 function fecharImagem() {
     el("visor").hidden = true;
+    el("pdf").removeAttribute("href");
+    el("pdf").hidden = true;
+    el("imagem").hidden = true;
     el("imagem").removeAttribute("src");
     if (imagemUrl) URL.revokeObjectURL(imagemUrl);
     imagemUrl = null;
@@ -81,7 +84,9 @@ async function consultar(tipo, id, nome) {
     const cadastro = await (await api(rota)).json();
     const historico = await (await api(rota + "/historico")).json();
     selecionado = {tipo, id, nome, rota};
-    el("titulo").textContent = nome;
+    el("titulo").textContent = cadastro.nomeMotorista || nome;
+    el("identidade").checked = false;
+    el("identificacao").hidden = tipo !== "MOTORISTA";
     el("situacao").textContent = "Situação: " + cadastro.situacao;
     const v = cadastro.dadosVeiculo[0];
     el("dados").textContent = v ? v.portas + " portas · Ar-condicionado: " + (v.ar_condicionado ? "sim" : "não")
@@ -93,12 +98,23 @@ async function consultar(tipo, id, nome) {
         const conferir = document.createElement("input");
         conferir.type = "checkbox";
         conferir.value = doc.id;
+        conferir.dataset.tipo = doc.tipo;
         conferir.disabled = true;
         linha.append(botao("Visualizar " + doc.tipo, async () => {
             fecharImagem();
             const arquivo = await (await api(rota + "/documentos/" + doc.id)).blob();
+            if (arquivo.type === "application/pdf") {
+                imagemUrl = URL.createObjectURL(arquivo);
+                el("pdf").href = imagemUrl;
+                el("pdf").hidden = false;
+                el("visor").hidden = false;
+                el("pdf").onclick = () => { conferir.disabled = false; };
+                el("aviso").textContent = "Baixe e confira o PDF antes de marcar o documento.";
+                return;
+            }
             if (arquivo.type !== "image/jpeg") throw new Error("Formato de documento inesperado.");
             imagemUrl = URL.createObjectURL(arquivo);
+            el("imagem").hidden = false;
             el("imagem").src = imagemUrl;
             el("imagem").alt = doc.tipo + " do cadastro selecionado";
             try {
@@ -143,13 +159,19 @@ el("decisao").onsubmit = e => {
     const situacao = e.submitter.value;
     const documentosConferidos = Array.from(el("documentos").querySelectorAll("input:checked"), c => c.value);
     if (!motivo) { el("aviso").textContent = "Informe uma justificativa."; return; }
-    if (situacao === "APROVADO" && documentosConferidos.length !== (tipo === "MOTORISTA" ? 3 : 1)) {
+    const exigidos = tipo === "MOTORISTA" ? ["CNH", "ANTECEDENTES", "FOTO_PERFIL", "RESIDENCIA"] : ["CRLV"];
+    const marcados = Array.from(el("documentos").querySelectorAll("input:checked"), c => c.dataset.tipo);
+    const identidadeConferida = el("identidade").checked;
+    if (situacao === "APROVADO" && tipo === "MOTORISTA" && !identidadeConferida) {
+        el("aviso").textContent = "Confirme a conferência de identidade."; return;
+    }
+    if (situacao === "APROVADO" && !exigidos.every(t => marcados.includes(t))) {
         el("aviso").textContent = "Visualize e marque todos os documentos exigidos antes de aprovar."; return;
     }
     if (!window.confirm("Confirmar " + (situacao === "APROVADO" ? "aprovação" : "rejeição") + " de " + nome + "?\n" + motivo)) return;
     executar(async () => {
         await api(rota + "/decisoes", {method: "POST", headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({situacao, motivo, documentosConferidos})});
+            body: JSON.stringify({situacao, motivo, documentosConferidos, identidadeConferida})});
         limparDetalhe();
         try {
             await fila();
