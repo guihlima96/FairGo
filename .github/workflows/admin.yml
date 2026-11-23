@@ -49,3 +49,7 @@ jobs:
           done
           python3 tests/test_validacao.py
           /tmp/fairgo-ui/bin/python tests/test_painel.py
+          # Reutilizar o banco confirma o isolamento entre execuções locais consecutivas.
+          for rodada in 1 2 3; do
+            python3 tests/test_driver.py
+          done

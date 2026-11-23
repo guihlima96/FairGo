@@ -72,9 +72,27 @@ python backend/tests/test_validacao.py
 
 Documentos ficam em PostgreSQL como bytes cifrados com AES-256-GCM, nonce aleatório por gravação e vínculo autenticado ao cadastro e tipo. O servidor identifica, decodifica e recodifica JPEG, descartando metadados e o nome original. Para PDF, um processo separado renderiza até dez páginas e reconstrói um arquivo com imagens das páginas. A cópia visual descarta metadados originais, ações, anexos e links interativos. Assinaturas digitais do original não são preservadas. A entrada e a saída trafegam por pipes em memória. A conversão ocorre antes da transação que grava a revisão e reabre o cadastro. A coluna formato identifica JPEG e PDF nas novas gravações. Documentos JPEG anteriores e cópias PDF já normalizadas continuam legíveis. PDFs brutos da versão intermediária de desenvolvimento exigem reenvio. Cada conversão tem até 15 segundos, heap de 160 MiB, lado maior de até 1800 pixels e saída de até 4 MiB. Há duas conversões simultâneas por instância. Cópias acima de 4 MiB retornam HTTP 413. O processo filho compartilha as permissões de disco e rede do usuário do backend. Em produção, use container com usuário sem privilégios, escrita restrita e rede limitada aos serviços necessários. Antes de liberar o Driver, valide manualmente legibilidade e tempo de conversão no ambiente de destino com CNH digital e comprovante digitalizado autorizados, incluindo documento de dez páginas. Registre apenas tempos, tamanhos e resultado da leitura. Downloads administrativos usam no-store. Dados completos de CNH, CRLV e laudos permanecem dentro da imagem. Não registrar tokens, imagens ou corpos multipart nos logs.
 
-Em produção use HTTPS, banco em rede privada, cofre de segredos e backup testado. Aplique schema.sql e validacao.sql com credencial de migração e defina SPRING_SQL_INIT_MODE=never na aplicação. Conceda à conta da API SELECT em credenciais_admin e limites_municipais, SELECT/INSERT em decisoes_cadastro, uso na sequência e apenas as permissões de leitura e gravação necessárias nas tabelas de cadastro. Restrinja provisionamento e alteração do histórico a funções operacionais separadas.
+Em produção use HTTPS, banco em rede privada, cofre de segredos e backup testado. Aplique, em ordem, `schema.sql`, `validacao.sql` e `driver.sql` com credencial de migração e defina SPRING_SQL_INIT_MODE=never na aplicação. Conceda à conta da API SELECT em credenciais_admin e limites_municipais, SELECT/INSERT em decisoes_cadastro, uso na sequência e apenas as permissões de leitura e gravação necessárias nas tabelas de cadastro. Restrinja provisionamento e alteração do histórico a funções operacionais separadas.
 
 A conferência é manual. Autenticidade, suspensão de CNH, situação oficial de CRLV, emissão de antecedentes e confirmação do laudo dependem de consulta ao emissor ou de integração autorizada. Também ficam para operação posterior atualização oficial por município, antivírus externo, política de retenção e revalidação anual agendada. O status reflete a última decisão registrada.
+
+## API do motorista
+
+A API `/api/driver` oferece cadastro, login, consulta ao próprio perfil e logout. O pedido de recuperação tem resposta uniforme. A emissão e entrega do token aguardam a definição do canal verificado. O [contrato da Etapa 5.2](../docs/etapa-5-driver-admin.md) descreve rotas, corpos e códigos HTTP.
+
+Na conta de execução do backend, acrescente às permissões do Admin:
+
+| Tabela | Permissões para o Driver |
+|---|---|
+| usuarios | SELECT e INSERT para o perfil do motorista |
+| contas_driver | SELECT, INSERT e UPDATE apenas em senha_hash para a redefinição de senha |
+| sessoes_driver | SELECT, INSERT e DELETE para autenticação, expiração e logout |
+| limites_driver | SELECT, INSERT, UPDATE em contador e DELETE para contabilizar e limpar tentativas |
+| recuperacoes_driver | SELECT e DELETE para consumir o token |
+
+Use uma credencial de migração separada para a estrutura. A emissão futura de tokens e a marcação de contatos verificados dependem de fluxos próprios.
+
+Com o backend apontado para o banco descartável terminado em `_test`, execute `python backend/tests/test_driver.py` na raiz. A suíte limpa os contadores de tentativas ao iniciar. Use o banco exclusivamente para essa suíte durante a execução.
 
 ## Testes automáticos e painel
 
