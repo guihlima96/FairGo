@@ -148,7 +148,7 @@ class ValidacaoAdmin {
             if (alvo == Alvo.VEICULO && !veiculoElegivel(id)) throw new ResponseStatusException(UNPROCESSABLE_ENTITY);
         }
         registrar(alvo,id,decisao.situacao().name(),decisao.motivo().strip(),admin,
-                alvo == Alvo.MOTORISTA && decisao.situacao() == Resultado.APROVADO
+                decisao.situacao() == Resultado.APROVADO
                         ? decisao.documentosConferidos().toArray(UUID[]::new) : null);
     }
 
@@ -166,14 +166,21 @@ class ValidacaoAdmin {
 
     private void registrar(Alvo alvo, UUID id, String status, String motivo, Principal admin, UUID[] revisoes) {
         db.update("UPDATE " + alvo.tabela + " SET situacao=? WHERE id=?", status, id);
-        db.update("INSERT INTO decisoes_cadastro (" + alvo.coluna + ",situacao,motivo,responsavel,revisoes_identidade) VALUES (?,?,?,?,?)",
+        db.update("INSERT INTO decisoes_cadastro (" + alvo.coluna + ",situacao,motivo,responsavel,revisoes_conferidas) VALUES (?,?,?,?,?)",
                 id,status,motivo,admin.getName(),revisoes);
     }
 
     @GetMapping("/{alvo}/{id}/historico")
     public List<Map<String,Object>> historico(@PathVariable Alvo alvo, @PathVariable UUID id) {
         estado(alvo,id,false);
-        return db.queryForList("SELECT sequencia,situacao,motivo,responsavel,data,to_json(revisoes_identidade)::text AS revisoes_identidade FROM decisoes_cadastro WHERE "
-                + alvo.coluna + "=? ORDER BY sequencia",id);
+        return db.query("SELECT sequencia,situacao,motivo,responsavel,data,revisoes_conferidas FROM decisoes_cadastro WHERE "
+                + alvo.coluna + "=? ORDER BY sequencia", (rs, n) -> {
+                    var evento = new LinkedHashMap<String,Object>();
+                    for (String campo : List.of("sequencia","situacao","motivo","responsavel","data"))
+                        evento.put(campo, rs.getObject(campo));
+                    var revisoes = rs.getArray("revisoes_conferidas");
+                    evento.put("revisoes_conferidas", revisoes == null ? null : revisoes.getArray());
+                    return evento;
+                },id);
     }
 }

@@ -6,8 +6,6 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.*;
 import java.util.*;
-import org.apache.pdfbox.Loader;
-import org.apache.pdfbox.pdmodel.PDDocument;
 import javax.crypto.*;
 import javax.crypto.spec.*;
 import javax.imageio.*;
@@ -37,10 +35,8 @@ class Cofre {
             if (pdf(dados)) {
                 if (!Set.of("CNH","CRLV","RESIDENCIA","ANTECEDENTES").contains(tipo))
                     throw new IOException();
-                try (PDDocument documento = Loader.loadPDF(dados)) {
-                    if (documento.isEncrypted() || documento.getNumberOfPages() < 1)
-                        throw new IOException();
-                }
+                byte[] limpo = PdfSeguro.converter(dados);
+                dados = ByteBuffer.allocate(1 + limpo.length).put((byte) 1).put(limpo).array();
             } else {
                 dados = jpeg(dados);
             }
@@ -82,8 +78,17 @@ class Cofre {
     }
 
     byte[] abrir(byte[] data, UUID dono, String tipo) throws GeneralSecurityException {
-        return cipher(Cipher.DECRYPT_MODE, Arrays.copyOf(data,12), dono, tipo)
+        byte[] claro = cipher(Cipher.DECRYPT_MODE, Arrays.copyOf(data,12), dono, tipo)
                 .doFinal(data, 12, data.length - 12);
+        if (claro[0] == 1) return Arrays.copyOfRange(claro, 1, claro.length);
+        if (pdf(claro)) {
+            try {
+                return PdfSeguro.converter(claro);
+            } catch (IOException ex) {
+                throw new ResponseStatusException(UNPROCESSABLE_ENTITY, "Solicite novo documento");
+            }
+        }
+        return claro;
     }
 
     private Cipher cipher(int modo, byte[] nonce, UUID dono, String tipo) throws GeneralSecurityException {
