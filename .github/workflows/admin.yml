@@ -49,3 +49,4 @@ jobs:
           done
           python3 tests/test_validacao.py
           /tmp/fairgo-ui/bin/python tests/test_painel.py
+          python3 tests/test_driver.py

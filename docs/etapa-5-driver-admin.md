@@ -44,3 +44,24 @@ Na etapa da foto, abrir a câmera e permitir tirar, revisar e refazer a foto ant
 ## Autenticidade do documento digital
 
 A implementação atual guarda a cópia visual cifrada. A assinatura do arquivo recebido só poderá ser validada durante o envio, antes da conversão. Para uma revisão posterior, será necessário consultar o emissor com um QR code ou outro identificador legível, quando disponível, ou solicitar o original novamente. A escolha do provedor e a política de validação automática seguem pendentes.
+
+## Etapa 5.2 — Contrato proposto para revisão
+
+Prefixo `/api/driver`. Requisições e respostas com corpo usam JSON. Clientes devem usar HTTPS em produção. Enviar o token apenas no cabeçalho `Authorization: Bearer <token>`. O número de cadastro desta proposta é o UUID entregue no cadastro.
+
+| Método e rota | Entrada | Resultado |
+|---|---|---|
+| POST /contas | nome, cpf, celular, email, senha | 201 com id e situacao=PENDENTE. Dados inválidos retornam 400. CPF ou e-mail duplicado retorna 409 sem identificar o campo. |
+| POST /sessoes | identificador (e-mail ou UUID) e senha | 200 com token e expiraEm. Falha de credencial retorna 401 e limite de tentativas retorna 429. |
+| GET /me | Bearer Driver | 200 com dados do próprio perfil, situação e indicadores de verificação. Sessão inválida retorna 401. |
+| DELETE /sessoes/atual | Bearer Driver | 204. Revoga a sessão apresentada. |
+| POST /recuperacao | email | 202 vazio para qualquer endereço sintaticamente válido. Nesta entrega nenhum token é emitido e nenhuma mensagem é enviada. |
+| POST /recuperacao/confirmacao | token e novaSenha | 204 ao consumir uma credencial válida associada a e-mail verificado. Token inválido, expirado ou consumido retorna 400. A troca revoga todas as sessões. |
+
+A criação do usuário e da conta ocorre em uma transação. O servidor define o perfil MOTORISTA. O CPF é validado pelos dígitos verificadores e guardado sem pontuação. O celular brasileiro com DDD é normalizado para +55. O e-mail é convertido para minúsculas e nunca vincula automaticamente um cadastro anterior. Nome, e-mail e celular iniciam sem verificação. O login concede acesso apenas à área de cadastro.
+
+**Parâmetros técnicos para revisão.** Senhas de 15 a 128 caracteres, PBKDF2-HMAC-SHA256 com salt aleatório e 600 mil iterações. Sessões opacas com 256 bits aleatórios, digest no servidor e validade de oito horas. O banco compartilha os limites entre instâncias. Em quinze minutos, o login admite oito tentativas por conta e quarenta por endereço de origem. Um login válido limpa o contador da conta. O endereço é o do par da conexão HTTP. Atrás de proxy, validar o encaminhamento confiável e os limites antes da exposição pública.
+
+**Banco e operação.** Aplicar `backend/src/main/resources/driver.sql` após os scripts existentes com a credencial de migração em produção. As tabelas são aditivas. Restringir as permissões de execução aos dados necessários, proteger banco e backups e evitar registrar corpos de requisições e cabeçalhos de autorização. Cadastros legados exigem comprovação de titularidade em fluxo futuro.
+
+**Recuperação pendente de integração.** O futuro emissor deverá confirmar o contato verificado, gerar um segredo aleatório de uso único com prefixo rec_, persistir apenas seu SHA-256 com prazo e entregar pelo canal aprovado. A confirmação e a revogação estão implementadas. Ainda dependem de decisão o método de verificação, o provedor, o prazo do token e o atendimento a quem perdeu o contato. Os testes provisionam credenciais exclusivamente no banco descartável.
