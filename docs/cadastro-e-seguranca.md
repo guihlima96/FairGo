@@ -21,12 +21,16 @@ Os itens acima são pendências de produto e engenharia, não controles já impl
 
 ## Requisitos de habilitação e veículos — regras aprovadas
 
-### Documentação do motorista
+### Dados e documentos do motorista
 
-- O motorista deverá apresentar CNH válida com a observação EAR (Exerce Atividade Remunerada).
-- O motorista deverá anexar o CRLV do veículo.
+- Informar nome completo, número de celular ativo, e-mail e CPF. Verificar nome e contatos durante o cadastro. Os métodos de verificação estão em aberto.
+- Enviar foto de perfil frontal, nítida, sem óculos escuros e distinta da foto da CNH.
+- Apresentar comprovante de residência em nome do motorista.
+- O motorista deverá apresentar CNH definitiva e válida (PPD não aceita) com a observação EAR (Exerce Atividade Remunerada).
+- O motorista deverá anexar o CRLV atualizado do veículo.
 - A documentação deverá ser verificada antes da aprovação do cadastro.
-- Os requisitos anteriormente definidos de antecedentes criminais, exame toxicológico e verificação de identidade permanecem aplicáveis.
+- A verificação de identidade e a de antecedentes criminais são obrigatórias. O exame toxicológico é facultativo nesta etapa. Sua ausência permite concluir a análise e aprovar o cadastro quando os requisitos obrigatórios forem atendidos.
+- Aceitar JPEG ou PDF para cada um destes documentos: CNH digital ou física, CRLV e comprovante de residência. O comprovante de antecedentes criminais também poderá ser enviado em PDF.
 
 ### Requisitos mínimos do veículo
 
