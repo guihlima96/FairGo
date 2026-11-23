@@ -24,7 +24,7 @@ Os itens acima são pendências de produto e engenharia, não controles já impl
 ### Dados e documentos do motorista
 
 - Informar nome completo, número de celular ativo, e-mail e CPF. Verificar nome e contatos durante o cadastro. Os métodos de verificação estão em aberto.
-- Enviar foto de perfil frontal, nítida, sem óculos escuros e distinta da foto da CNH.
+- Tirar a foto de perfil pela câmera durante o cadastro. A foto deve ser frontal, nítida, sem óculos escuros e distinta da foto da CNH. O fluxo do motorista deve oferecer captura e nova tentativa pela câmera, sem seleção da galeria ou de arquivos existentes.
 - Apresentar comprovante de residência em nome do motorista.
 - O motorista deverá apresentar CNH definitiva e válida (PPD não aceita) com a observação EAR (Exerce Atividade Remunerada).
 - O motorista deverá anexar o CRLV atualizado do veículo.

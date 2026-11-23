@@ -36,3 +36,11 @@ A proposta é oferecer operações próprias ao Driver e reutilizar a gravação
 Manter o workflow e as suítes atuais do Admin como regressão. Acrescentar cenários Driver com banco exclusivo e identidades fictícias. Percorrer cadastro, autenticação, vínculo do veículo e envio; verificar a presença no painel, rejeitar um documento ilegível, corrigir, conferir a nova revisão, aprovar e consultar os dois estados pelo Driver. Conferir o histórico após cada decisão.
 
 Testar também acesso cruzado entre dois motoristas, tentativa de autoaprovação, cadastro duplicado e recuperação de acesso. Confirmar que cadastros criados antes da Etapa 5 continuam consultáveis no painel. Contratos de API, esquema de credenciais e política de retenção permanecem sujeitos a revisão.
+
+## Captura da foto pelo motorista
+
+Na etapa da foto, abrir a câmera e permitir tirar, revisar e refazer a foto antes do envio em JPEG. Se o acesso à câmera estiver indisponível, informar como tentar novamente. Não oferecer galeria nem seletor de arquivos nesse fluxo. Nos testes do aplicativo, conferir a captura, a nova tentativa e o caso de permissão negada. O endpoint administrativo atual recebe JPEG e a conferência visual pelo Admin não comprova a origem da imagem.
+
+## Autenticidade do documento digital
+
+A implementação atual guarda a cópia visual cifrada. A assinatura do arquivo recebido só poderá ser validada durante o envio, antes da conversão. Para uma revisão posterior, será necessário consultar o emissor com um QR code ou outro identificador legível, quando disponível, ou solicitar o original novamente. A escolha do provedor e a política de validação automática seguem pendentes.

@@ -27,10 +27,38 @@ class Cofre {
         chave = new SecretKeySpec(key, "AES");
     }
 
-    byte[] preparar(MultipartFile arquivo, UUID dono, String tipo) {
+    record Preparado(String formato, byte[] cifrado) {}
+
+    Preparado preparar(MultipartFile arquivo, UUID dono, String tipo) {
         if (arquivo.isEmpty() || arquivo.getSize() > 4194304)
             throw new ResponseStatusException(BAD_REQUEST);
-        try (var input = new MemoryCacheImageInputStream(arquivo.getInputStream())) {
+        try {
+            byte[] dados = arquivo.getBytes();
+            String formato = pdf(dados) ? "PDF" : "JPEG";
+            if (formato.equals("PDF")) {
+                if (!Set.of("CNH","CRLV","RESIDENCIA","ANTECEDENTES").contains(tipo))
+                    throw new IOException();
+                dados = PdfSeguro.converter(dados);
+            } else {
+                dados = jpeg(dados);
+            }
+            byte[] nonce = new byte[12];
+            random.nextBytes(nonce);
+            byte[] encrypted = cipher(Cipher.ENCRYPT_MODE, nonce, dono, tipo + ":" + formato).doFinal(dados);
+            return new Preparado(formato, ByteBuffer.allocate(12 + encrypted.length).put(nonce).put(encrypted).array());
+        } catch (IOException | IllegalArgumentException e) {
+            throw new ResponseStatusException(BAD_REQUEST, "Documento inválido");
+        } catch (GeneralSecurityException e) {
+            throw new IllegalStateException("Falha no cofre", e);
+        }
+    }
+
+    static boolean pdf(byte[] dados) {
+        return dados.length >= 5 && new String(dados, 0, 5, StandardCharsets.US_ASCII).equals("%PDF-");
+    }
+
+    private byte[] jpeg(byte[] dados) throws IOException {
+        try (var input = new MemoryCacheImageInputStream(new ByteArrayInputStream(dados))) {
             var readers = ImageIO.getImageReaders(input);
             if (!readers.hasNext()) throw new IOException();
             var reader = readers.next();
@@ -44,23 +72,23 @@ class Cofre {
                 try (var out = new MemoryCacheImageOutputStream(bytes)) {
                     if (!ImageIO.write(photo, "jpeg", out)) throw new IOException();
                 }
-                byte[] nonce = new byte[12];
-                random.nextBytes(nonce);
-                byte[] encrypted = cipher(Cipher.ENCRYPT_MODE, nonce, dono, tipo).doFinal(bytes.toByteArray());
-                return ByteBuffer.allocate(12 + encrypted.length).put(nonce).put(encrypted).array();
+                return bytes.toByteArray();
             } finally {
                 reader.dispose();
             }
-        } catch (IOException | IllegalArgumentException e) {
-            throw new ResponseStatusException(BAD_REQUEST, "JPEG inválido");
-        } catch (GeneralSecurityException e) {
-            throw new IllegalStateException("Falha no cofre", e);
         }
     }
 
-    byte[] abrir(byte[] data, UUID dono, String tipo) throws GeneralSecurityException {
-        return cipher(Cipher.DECRYPT_MODE, Arrays.copyOf(data,12), dono, tipo)
+    byte[] abrir(byte[] data, UUID dono, String tipo, String formato) throws GeneralSecurityException {
+        String contexto = formato == null ? tipo : tipo + ":" + formato;
+        byte[] claro = cipher(Cipher.DECRYPT_MODE, Arrays.copyOf(data,12), dono, contexto)
                 .doFinal(data, 12, data.length - 12);
+        if (formato != null) return claro;
+        if (claro[0] == 1) return Arrays.copyOfRange(claro, 1, claro.length);
+        if (pdf(claro)) {
+            throw new ResponseStatusException(UNPROCESSABLE_ENTITY, "Reenvie o PDF de desenvolvimento");
+        }
+        return claro;
     }
 
     private Cipher cipher(int modo, byte[] nonce, UUID dono, String tipo) throws GeneralSecurityException {

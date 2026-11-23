@@ -6,7 +6,7 @@ import uuid
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
-from test_validacao import URL, TOKEN, DIGEST, call, upload, sql
+from test_validacao import URL, TOKEN, DIGEST, call, upload, sql, pdf_teste
 import os
 
 
@@ -20,7 +20,7 @@ class Painel(unittest.TestCase):
                                            "perfil": "MOTORISTA"}, "POST")["id"]
         placa = "WEB" + str(uuid.uuid4().int % 10000).zfill(4)
         veiculo = call("veiculos", 201, {"placa": placa, "motoristaId": motorista}, "POST")["id"]
-        for tipo in ("ANTECEDENTES", "TOXICOLOGICO", "CNH"):
+        for tipo in ("ANTECEDENTES", "FOTO_PERFIL", "RESIDENCIA", "CNH"):
             upload("validacao/MOTORISTA/" + motorista, tipo,
                    {"ear": "true", "validade": "2099-12-31"} if tipo == "CNH" else {})
         rota = "validacao/VEICULO/" + veiculo
@@ -42,14 +42,24 @@ class Painel(unittest.TestCase):
         navegador.get(URL + "/admin/index.html")
         campo("token").send_keys(TOKEN)
         campo("acesso").find_element(By.TAG_NAME, "button").click()
-        for descricao, resultado in [(nome, "REJEITADO"), (placa, "APROVADO")]:
+        for descricao, resultado in [(nome, "REJEITADO"), (placa, "APROVADO"), (nome, "APROVADO")]:
+            conferir_identidade = descricao == nome and resultado == "APROVADO"
+            if conferir_identidade:
+                upload("validacao/MOTORISTA/" + motorista, "RESIDENCIA", image=pdf_teste())
+                campo("acesso").find_element(By.TAG_NAME, "button").click()
             espera.until(lambda _: descricao in campo("fila").text)
             campo("fila").find_element(By.XPATH, ".//button[contains(.,'" + descricao + "')]").click()
             espera.until(lambda _: descricao in campo("titulo").text)
-            campo("documentos").find_element(By.TAG_NAME, "button").click()
-            espera.until(lambda _: campo("visor").is_displayed())
-            campo("documentos").find_element(By.TAG_NAME, "input").click()
-            campo("fechar").click()
+            linhas = campo("documentos").find_elements(By.TAG_NAME, "li")
+            for linha in linhas if conferir_identidade else linhas[:1]:
+                linha.find_element(By.TAG_NAME, "button").click()
+                espera.until(lambda _: campo("visor").is_displayed())
+                if campo("pdf").is_displayed():
+                    campo("pdf").click()
+                linha.find_element(By.TAG_NAME, "input").click()
+                campo("fechar").click()
+            if conferir_identidade:
+                campo("identidade").click()
             botao = campo("decisao").find_element(By.CSS_SELECTOR, "button[value='" + resultado + "']")
             botao.click()
             self.assertFalse(campo("motivo").get_property("validity")["valid"])

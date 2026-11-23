@@ -8,6 +8,7 @@ import jakarta.validation.constraints.*;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.http.*;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
@@ -26,18 +27,20 @@ class ValidacaoAdmin {
             this.filtro = filtro;
         }
     }
-    enum Tipo { CNH, ANTECEDENTES, TOXICOLOGICO, CRLV }
+    enum Tipo { CNH, ANTECEDENTES, TOXICOLOGICO, FOTO_PERFIL, RESIDENCIA, CRLV }
     enum Resultado { APROVADO, REJEITADO }
     record Dados(@Min(1) @Max(20) int portas, @NotNull Boolean arCondicionado,
                  @Min(1886) int anoFabricacao, @NotNull @Pattern(regexp="[0-9]{7}") String municipio) {}
     record Decisao(@NotNull Resultado situacao, @NotBlank @Size(max=500) String motivo,
-                   @Size(max=4) Set<UUID> documentosConferidos) {}
+                   Boolean identidadeConferida, @Size(max=5) Set<UUID> documentosConferidos) {}
     record Documento(UUID id, Tipo tipo, LocalDate validade, Boolean ear) {}
     private final JdbcTemplate db;
     private final Cofre cofre;
+    private final TransactionTemplate transacao;
     private static final ZoneId FUSO = ZoneId.of("America/Sao_Paulo");
 
-    ValidacaoAdmin(JdbcTemplate db, Cofre cofre) {
+    ValidacaoAdmin(JdbcTemplate db, Cofre cofre, TransactionTemplate transacao) {
+        this.transacao = transacao;
         this.db = db;
         this.cofre = cofre;
     }
@@ -65,21 +68,24 @@ class ValidacaoAdmin {
     }
 
     @PutMapping(value="/{alvo}/{id}/documentos/{tipo}", consumes="multipart/form-data")
-    @Transactional
     public Documento enviar(@PathVariable Alvo alvo, @PathVariable UUID id, @PathVariable Tipo tipo,
                     @RequestParam MultipartFile arquivo, @RequestParam(required=false) Boolean ear,
                     @RequestParam(required=false) LocalDate validade, Principal admin) {
         if ((tipo == Tipo.CRLV) != (alvo == Alvo.VEICULO)
                 || (tipo == Tipo.CNH) != (ear != null) || (tipo == Tipo.CNH && validade == null))
             throw new ResponseStatusException(BAD_REQUEST);
-        String anterior = estado(alvo, id, true);
-        UUID revisao = UUID.randomUUID();
-        db.update("INSERT INTO documentos_cadastro (id," + alvo.coluna + ",tipo,validade,ear,imagem_cifrada)"
-                + " VALUES (?,?,?,?,?,?) ON CONFLICT (" + alvo.coluna + ",tipo) DO UPDATE SET id=excluded.id,"
-                + " validade=excluded.validade,ear=excluded.ear,imagem_cifrada=excluded.imagem_cifrada",
-                revisao, id, tipo.name(), validade, ear, cofre.preparar(arquivo,id,tipo.name()));
-        reabrir(alvo, id, anterior, admin);
-        return new Documento(revisao, tipo, validade, ear);
+        estado(alvo, id, false);
+        var documento = cofre.preparar(arquivo, id, tipo.name());
+        return transacao.execute(status -> {
+            String anterior = estado(alvo, id, true);
+            UUID revisao = UUID.randomUUID();
+            db.update("INSERT INTO documentos_cadastro (id," + alvo.coluna + ",tipo,validade,ear,imagem_cifrada,formato)"
+                    + " VALUES (?,?,?,?,?,?,?) ON CONFLICT (" + alvo.coluna + ",tipo) DO UPDATE SET id=excluded.id,"
+                    + " validade=excluded.validade,ear=excluded.ear,imagem_cifrada=excluded.imagem_cifrada, formato=excluded.formato",
+                    revisao, id, tipo.name(), validade, ear, documento.cifrado(), documento.formato());
+            reabrir(alvo, id, anterior, admin);
+            return new Documento(revisao, tipo, validade, ear);
+        });
     }
 
     @GetMapping("/pendentes")
@@ -95,7 +101,8 @@ class ValidacaoAdmin {
 
     @GetMapping("/{alvo}/{id}")
     public Map<String,Object> consultar(@PathVariable Alvo alvo, @PathVariable UUID id) {
-        return Map.of("situacao",estado(alvo,id,false), "documentos",documentos(alvo,id),
+        String situacao = estado(alvo,id,false);
+        return Map.of("nomeMotorista", alvo == Alvo.MOTORISTA ? db.queryForObject("SELECT nome FROM usuarios WHERE id=?",String.class,id) : "", "situacao",situacao, "documentos",documentos(alvo,id),
                 "dadosVeiculo", alvo == Alvo.VEICULO ? db.queryForList(
                 "SELECT portas, ar_condicionado, ano_fabricacao, municipio FROM dados_veiculo WHERE veiculo_id=?",id) : List.of());
     }
@@ -109,13 +116,16 @@ class ValidacaoAdmin {
     @GetMapping("/{alvo}/{id}/documentos/{revisao}")
     public ResponseEntity<byte[]> imagem(@PathVariable Alvo alvo, @PathVariable UUID id,
                               @PathVariable UUID revisao) throws GeneralSecurityException {
-        var rows = db.queryForList("SELECT tipo, imagem_cifrada FROM documentos_cadastro WHERE "
+        var rows = db.queryForList("SELECT tipo, formato, imagem_cifrada FROM documentos_cadastro WHERE "
                 + alvo.coluna + "=? AND id=?", id, revisao);
         if (rows.isEmpty()) throw new ResponseStatusException(NOT_FOUND);
         var row = rows.get(0);
-        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).contentType(MediaType.IMAGE_JPEG)
-                .header("Content-Disposition","attachment; filename=documento.jpg")
-                .body(cofre.abrir((byte[]) row.get("imagem_cifrada"), id, (String) row.get("tipo")));
+        byte[] dados = cofre.abrir((byte[]) row.get("imagem_cifrada"), id, (String) row.get("tipo"), (String) row.get("formato"));
+        boolean pdf = Cofre.pdf(dados);
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .contentType(pdf ? MediaType.APPLICATION_PDF : MediaType.IMAGE_JPEG)
+                .header("Content-Disposition", pdf ? "attachment; filename=documento.pdf" : "attachment; filename=documento.jpg")
+                .body(dados);
     }
 
     @PostMapping("/{alvo}/{id}/decisoes")
@@ -126,16 +136,26 @@ class ValidacaoAdmin {
         if (!estado(alvo,id,true).equals("PENDENTE")) throw new ResponseStatusException(CONFLICT);
         if (decisao.situacao() == Resultado.APROVADO) {
             var docs = documentos(alvo,id);
-            int exigidos = alvo == Alvo.MOTORISTA ? 3 : 1;
-            if (docs.size() != exigidos || decisao.documentosConferidos() == null
-                    || decisao.documentosConferidos().size() != exigidos
-                    || docs.stream().anyMatch(d -> !decisao.documentosConferidos().contains(d.id())
-                    || Boolean.FALSE.equals(d.ear())
-                    || (d.validade() != null && d.validade().isBefore(LocalDate.now(FUSO)))))
+            var exigidos = alvo == Alvo.MOTORISTA
+                    ? EnumSet.of(Tipo.CNH, Tipo.ANTECEDENTES, Tipo.FOTO_PERFIL, Tipo.RESIDENCIA)
+                    : EnumSet.of(Tipo.CRLV);
+            var conferidos = decisao.documentosConferidos();
+            var atuais = docs.stream().map(Documento::id).toList();
+            if (conferidos == null || !atuais.containsAll(conferidos)
+                    || (alvo == Alvo.MOTORISTA && !Boolean.TRUE.equals(decisao.identidadeConferida())))
                 throw new ResponseStatusException(UNPROCESSABLE_ENTITY);
+            for (Documento doc : docs) {
+                if (!exigidos.remove(doc.tipo())) continue;
+                if (!conferidos.contains(doc.id()) || Boolean.FALSE.equals(doc.ear())
+                        || (doc.validade() != null && doc.validade().isBefore(LocalDate.now(FUSO))))
+                    throw new ResponseStatusException(UNPROCESSABLE_ENTITY);
+            }
+            if (!exigidos.isEmpty()) throw new ResponseStatusException(UNPROCESSABLE_ENTITY);
             if (alvo == Alvo.VEICULO && !veiculoElegivel(id)) throw new ResponseStatusException(UNPROCESSABLE_ENTITY);
         }
-        registrar(alvo,id,decisao.situacao().name(),decisao.motivo().strip(),admin);
+        registrar(alvo,id,decisao.situacao().name(),decisao.motivo().strip(),admin,
+                decisao.situacao() == Resultado.APROVADO
+                        ? decisao.documentosConferidos().toArray(UUID[]::new) : null);
     }
 
     private boolean veiculoElegivel(UUID id) {
@@ -147,19 +167,26 @@ class ValidacaoAdmin {
     }
 
     private void reabrir(Alvo alvo, UUID id, String anterior, Principal admin) {
-        if (!anterior.equals("PENDENTE")) registrar(alvo,id,"PENDENTE","Cadastro atualizado",admin);
+        if (!anterior.equals("PENDENTE")) registrar(alvo,id,"PENDENTE","Cadastro atualizado",admin,null);
     }
 
-    private void registrar(Alvo alvo, UUID id, String status, String motivo, Principal admin) {
+    private void registrar(Alvo alvo, UUID id, String status, String motivo, Principal admin, UUID[] revisoes) {
         db.update("UPDATE " + alvo.tabela + " SET situacao=? WHERE id=?", status, id);
-        db.update("INSERT INTO decisoes_cadastro (" + alvo.coluna + ",situacao,motivo,responsavel) VALUES (?,?,?,?)",
-                id,status,motivo,admin.getName());
+        db.update("INSERT INTO decisoes_cadastro (" + alvo.coluna + ",situacao,motivo,responsavel,revisoes_conferidas) VALUES (?,?,?,?,?)",
+                id,status,motivo,admin.getName(),revisoes);
     }
 
     @GetMapping("/{alvo}/{id}/historico")
     public List<Map<String,Object>> historico(@PathVariable Alvo alvo, @PathVariable UUID id) {
         estado(alvo,id,false);
-        return db.queryForList("SELECT sequencia,situacao,motivo,responsavel,data FROM decisoes_cadastro WHERE "
-                + alvo.coluna + "=? ORDER BY sequencia",id);
+        return db.query("SELECT sequencia,situacao,motivo,responsavel,data,revisoes_conferidas FROM decisoes_cadastro WHERE "
+                + alvo.coluna + "=? ORDER BY sequencia", (rs, n) -> {
+                    var evento = new LinkedHashMap<String,Object>();
+                    for (String campo : List.of("sequencia","situacao","motivo","responsavel","data"))
+                        evento.put(campo, rs.getObject(campo));
+                    var revisoes = rs.getArray("revisoes_conferidas");
+                    evento.put("revisoes_conferidas", revisoes == null ? null : revisoes.getArray());
+                    return evento;
+                },id);
     }
 }

@@ -41,19 +41,19 @@ Prefixo: `/api/admin/validacao`. Substitua `{alvo}` por `MOTORISTA` ou `VEICULO`
 | Método e caminho relativo | Operação |
 |---|---|
 | PUT /VEICULO/{id}/dados | JSON com portas (inteiro), arCondicionado (booleano), anoFabricacao e municipio (código IBGE de 7 dígitos). |
-| PUT /{alvo}/{id}/documentos/{tipo} | multipart/form-data. Campo arquivo com foto JPEG legível de até 4 MiB e 8 milhões de pixels. Para CNH, enviar ear e validade (AAAA-MM-DD). Para os demais, validade quando aplicável. |
+| PUT /{alvo}/{id}/documentos/{tipo} | multipart/form-data. Campo arquivo com documento legível de até 4 MiB e 8 milhões de pixels. Para CNH, enviar ear e validade (AAAA-MM-DD). Para os demais, validade quando aplicável. |
 | GET /{alvo}/{id} | Situação, dados técnicos e metadados para revisão, incluindo UUID de cada versão atual. |
-| GET /{alvo}/{id}/documentos/{revisao} | Download autenticado de uma imagem para conferência. |
-| POST /{alvo}/{id}/decisoes | JSON com situacao, motivo e, para aprovação, documentosConferidos com os UUIDs de todas as imagens atuais verificadas. |
+| GET /{alvo}/{id}/documentos/{revisao} | Download autenticado do JPEG ou da cópia visual em PDF para conferência. |
+| POST /{alvo}/{id}/decisoes | JSON com situacao, motivo e, para aprovação, documentosConferidos com os UUIDs de todas as revisões obrigatórias e das facultativas conferidas. |
 | GET /{alvo}/{id}/historico | Decisões e reaberturas em ordem, com motivo, data do servidor e identidade do token. |
 
-Cada motorista exige CNH com EAR e validade vigente, antecedentes e toxicológico. O CRLV pertence ao veículo. A pessoa revisora deve verificar legibilidade, titularidade, correspondência de placa, EAR e conteúdo de cada comprovante antes de incluir sua versão. Descreva o motivo sem números de documento, resultados médicos ou outros dados pessoais. Exemplo de rejeição:
+Cada motorista exige CNH definitiva com EAR e validade vigente, antecedentes, FOTO_PERFIL e RESIDENCIA. O toxicológico é facultativo. CNH, CRLV, antecedentes e residência aceitam JPEG e PDF. Foto e toxicológico aceitam JPEG. O limite de 4 MiB vale por envio e o limite de pixels se aplica às imagens. Na aprovação de motorista, envie identidadeConferida=true e os UUIDs das revisões obrigatórias. O painel permite baixar o PDF para leitura. Confira o nome na CNH, a foto frontal própria e a titularidade do comprovante de residência. O histórico registra as revisões conferidas. A verificação automatizada de veracidade e autenticidade junto aos emissores é uma evolução futura. O CRLV pertence ao veículo. A pessoa revisora deve verificar legibilidade, titularidade, correspondência de placa, EAR e conteúdo de cada comprovante antes de incluir sua versão. Descreva o motivo sem números de documento, resultados médicos ou outros dados pessoais. Exemplo de rejeição:
 
 ```json
 {"situacao":"REJEITADO","motivo":"Imagem ilegível. Solicitar nova foto."}
 ```
 
-A gravação de evidência após uma decisão reabre o cadastro. O servidor serializa decisões e alterações sobre o mesmo cadastro e rejeita versões documentais substituídas. A aprovação exige todos os documentos e todos os requisitos. Dados insuficientes ou inelegíveis retornam 422; nova decisão sobre cadastro já decidido retorna 409.
+A gravação de evidência após uma decisão reabre o cadastro. O servidor serializa decisões e alterações sobre o mesmo cadastro e rejeita versões documentais substituídas. Clientes antigos que enviam somente as três revisões anteriores recebem 422 na aprovação do motorista. A confirmação manual inclui verificar que a CNH é definitiva, sem campo separado para PPD. Cadastros anteriormente aprovados mantêm a situação. Uma campanha de reavaliação depende de decisão de produto. O histórico devolve revisoes_conferidas como array de UUIDs para novas aprovações de motorista e veículo e null quando não há registro. Dados insuficientes ou inelegíveis retornam 422; nova decisão sobre cadastro já decidido retorna 409.
 
 ## Limite municipal
 
@@ -70,7 +70,7 @@ python backend/tests/test_validacao.py
 
 ## Operação e dependências externas
 
-Imagens ficam em PostgreSQL como bytes cifrados com AES-256-GCM, nonce aleatório por gravação e vínculo autenticado ao cadastro e tipo. O servidor identifica, decodifica e recodifica JPEG, descartando metadados e o nome original. Downloads administrativos usam no-store. Dados completos de CNH, CRLV e laudos permanecem dentro da imagem. Não registrar tokens, imagens ou corpos multipart nos logs.
+Documentos ficam em PostgreSQL como bytes cifrados com AES-256-GCM, nonce aleatório por gravação e vínculo autenticado ao cadastro e tipo. O servidor identifica, decodifica e recodifica JPEG, descartando metadados e o nome original. Para PDF, um processo separado renderiza até dez páginas e reconstrói um arquivo com imagens das páginas. A cópia visual descarta metadados originais, ações, anexos e links interativos. Assinaturas digitais do original não são preservadas. A entrada e a saída trafegam por pipes em memória. A conversão ocorre antes da transação que grava a revisão e reabre o cadastro. A coluna formato identifica JPEG e PDF nas novas gravações. Documentos JPEG anteriores e cópias PDF já normalizadas continuam legíveis. PDFs brutos da versão intermediária de desenvolvimento exigem reenvio. Cada conversão tem até 15 segundos, heap de 160 MiB, lado maior de até 1800 pixels e saída de até 4 MiB. Há duas conversões simultâneas por instância. Cópias acima de 4 MiB retornam HTTP 413. O processo filho compartilha as permissões de disco e rede do usuário do backend. Em produção, use container com usuário sem privilégios, escrita restrita e rede limitada aos serviços necessários. Antes de liberar o Driver, valide manualmente legibilidade e tempo de conversão no ambiente de destino com CNH digital e comprovante digitalizado autorizados, incluindo documento de dez páginas. Registre apenas tempos, tamanhos e resultado da leitura. Downloads administrativos usam no-store. Dados completos de CNH, CRLV e laudos permanecem dentro da imagem. Não registrar tokens, imagens ou corpos multipart nos logs.
 
 Em produção use HTTPS, banco em rede privada, cofre de segredos e backup testado. Aplique schema.sql e validacao.sql com credencial de migração e defina SPRING_SQL_INIT_MODE=never na aplicação. Conceda à conta da API SELECT em credenciais_admin e limites_municipais, SELECT/INSERT em decisoes_cadastro, uso na sequência e apenas as permissões de leitura e gravação necessárias nas tabelas de cadastro. Restrinja provisionamento e alteração do histórico a funções operacionais separadas.
 
