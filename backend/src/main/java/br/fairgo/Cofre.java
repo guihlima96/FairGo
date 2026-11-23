@@ -6,6 +6,8 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.*;
 import java.util.*;
+import org.apache.pdfbox.Loader;
+import org.apache.pdfbox.pdmodel.PDDocument;
 import javax.crypto.*;
 import javax.crypto.spec.*;
 import javax.imageio.*;
@@ -30,7 +32,35 @@ class Cofre {
     byte[] preparar(MultipartFile arquivo, UUID dono, String tipo) {
         if (arquivo.isEmpty() || arquivo.getSize() > 4194304)
             throw new ResponseStatusException(BAD_REQUEST);
-        try (var input = new MemoryCacheImageInputStream(arquivo.getInputStream())) {
+        try {
+            byte[] dados = arquivo.getBytes();
+            if (pdf(dados)) {
+                if (!Set.of("CNH","CRLV","RESIDENCIA","ANTECEDENTES").contains(tipo))
+                    throw new IOException();
+                try (PDDocument documento = Loader.loadPDF(dados)) {
+                    if (documento.isEncrypted() || documento.getNumberOfPages() < 1)
+                        throw new IOException();
+                }
+            } else {
+                dados = jpeg(dados);
+            }
+            byte[] nonce = new byte[12];
+            random.nextBytes(nonce);
+            byte[] encrypted = cipher(Cipher.ENCRYPT_MODE, nonce, dono, tipo).doFinal(dados);
+            return ByteBuffer.allocate(12 + encrypted.length).put(nonce).put(encrypted).array();
+        } catch (IOException | IllegalArgumentException e) {
+            throw new ResponseStatusException(BAD_REQUEST, "Documento inválido");
+        } catch (GeneralSecurityException e) {
+            throw new IllegalStateException("Falha no cofre", e);
+        }
+    }
+
+    static boolean pdf(byte[] dados) {
+        return dados.length >= 5 && new String(dados, 0, 5, StandardCharsets.US_ASCII).equals("%PDF-");
+    }
+
+    private byte[] jpeg(byte[] dados) throws IOException {
+        try (var input = new MemoryCacheImageInputStream(new ByteArrayInputStream(dados))) {
             var readers = ImageIO.getImageReaders(input);
             if (!readers.hasNext()) throw new IOException();
             var reader = readers.next();
@@ -44,17 +74,10 @@ class Cofre {
                 try (var out = new MemoryCacheImageOutputStream(bytes)) {
                     if (!ImageIO.write(photo, "jpeg", out)) throw new IOException();
                 }
-                byte[] nonce = new byte[12];
-                random.nextBytes(nonce);
-                byte[] encrypted = cipher(Cipher.ENCRYPT_MODE, nonce, dono, tipo).doFinal(bytes.toByteArray());
-                return ByteBuffer.allocate(12 + encrypted.length).put(nonce).put(encrypted).array();
+                return bytes.toByteArray();
             } finally {
                 reader.dispose();
             }
-        } catch (IOException | IllegalArgumentException e) {
-            throw new ResponseStatusException(BAD_REQUEST, "JPEG inválido");
-        } catch (GeneralSecurityException e) {
-            throw new IllegalStateException("Falha no cofre", e);
         }
     }
 
