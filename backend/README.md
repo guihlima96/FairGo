@@ -1,0 +1,77 @@
+# FAIRGO • validação administrativa
+
+## Executar localmente
+
+Pré-requisitos: JDK 17, Maven e PostgreSQL. No PowerShell, na raiz do projeto, configure o banco existente ou crie um banco e um usuário proprietário para desenvolvimento. Use uma chave AES de 32 bytes em Base64, estável entre reinícios. Gere-a **uma vez** com Python 3 e armazene a saída em um gerenciador de segredos:
+
+```powershell
+python -c "import secrets,base64; print(base64.b64encode(secrets.token_bytes(32)).decode())"
+$env:FAIRGO_DB_URL = 'jdbc:postgresql://localhost:5432/fairgo'
+$env:FAIRGO_DB_USER = 'fairgo_app'
+$env:FAIRGO_DB_PASSWORD = [Net.NetworkCredential]::new('', (Read-Host 'Senha do banco' -AsSecureString)).Password
+$env:FAIRGO_DOCUMENT_KEY = [Net.NetworkCredential]::new('', (Read-Host 'Chave Base64 do cofre' -AsSecureString)).Password
+mvn -f backend/pom.xml spring-boot:run
+```
+
+A inicialização adiciona tabelas às existentes. A chave perdida torna os documentos ilegíveis. Faça backup da chave separado do banco. A troca de chave exige recifrar as imagens existentes.
+
+## Identidade administrativa
+
+Cada pessoa recebe um token aleatório individual com prazo e revogação. A API aceita apenas o cabeçalho `Authorization: Bearer <token>`. Para gerar localmente um token e seu digest, execute no computador do operador autorizado (Python 3):
+
+```powershell
+python -c "import secrets,hashlib; t=secrets.token_hex(32); print('Token:',t); print('Digest:',hashlib.sha256(t.encode()).hexdigest())"
+```
+
+Entregue o token pelo canal de segredos da equipe. No psql, como responsável pelo provisionamento, insira **apenas o digest** e uma identidade única da pessoa. Exemplo com prompts:
+
+```sql
+\prompt 'Digest SHA-256: ' digest
+\prompt 'Identificador individual: ' pessoa
+INSERT INTO credenciais_admin (digest,admin_id,expira_em)
+VALUES (:'digest', :'pessoa', now()+interval '8 hours');
+```
+
+Para revogar, execute `UPDATE credenciais_admin SET revogada=true WHERE digest=:'digest';`. O próximo pedido já consulta a revogação. Os antigos POST /api/admin/usuarios e POST /api/admin/veiculos mantêm seus corpos, respostas e códigos. Clientes que usavam Basic precisam enviar o token. As antigas variáveis FAIRGO_ADMIN_USER/PASSWORD são dispensadas.
+
+## Conferência manual
+
+Prefixo: `/api/admin/validacao`. Substitua `{alvo}` por `MOTORISTA` ou `VEICULO` e `{id}` pelo UUID do respectivo cadastro.
+
+| Método e caminho relativo | Operação |
+|---|---|
+| PUT /VEICULO/{id}/dados | JSON com portas (inteiro), arCondicionado (booleano), anoFabricacao e municipio (código IBGE de 7 dígitos). |
+| PUT /{alvo}/{id}/documentos/{tipo} | multipart/form-data. Campo arquivo com foto JPEG legível de até 4 MiB e 8 milhões de pixels. Para CNH, enviar ear e validade (AAAA-MM-DD). Para os demais, validade quando aplicável. |
+| GET /{alvo}/{id} | Situação, dados técnicos e metadados para revisão, incluindo UUID de cada versão atual. |
+| GET /{alvo}/{id}/documentos/{revisao} | Download autenticado de uma imagem para conferência. |
+| POST /{alvo}/{id}/decisoes | JSON com situacao, motivo e, para aprovação, documentosConferidos com os UUIDs de todas as imagens atuais verificadas. |
+| GET /{alvo}/{id}/historico | Decisões e reaberturas em ordem, com motivo, data do servidor e identidade do token. |
+
+Cada motorista exige CNH com EAR e validade vigente, antecedentes e toxicológico. O CRLV pertence ao veículo. A pessoa revisora deve verificar legibilidade, titularidade, correspondência de placa, EAR e conteúdo de cada comprovante antes de incluir sua versão. Descreva o motivo sem números de documento, resultados médicos ou outros dados pessoais. Exemplo de rejeição:
+
+```json
+{"situacao":"REJEITADO","motivo":"Imagem ilegível. Solicitar nova foto."}
+```
+
+A gravação de evidência após uma decisão reabre o cadastro. O servidor serializa decisões e alterações sobre o mesmo cadastro e rejeita versões documentais substituídas. A aprovação exige todos os documentos e todos os requisitos. Dados insuficientes ou inelegíveis retornam 422; nova decisão sobre cadastro já decidido retorna 409.
+
+## Limite municipal
+
+O operador responsável deve conferir a regra municipal e registrar `ibge` e `idade_maxima` em `limites_municipais`. Registre 11 quando tiver verificado que o teto FAIRGO é aplicável. Valores entre 0 e 11 são aceitos. Município sem regra cadastrada bloqueia a aprovação. Na decisão, idade = ano atual em São Paulo menos ano de fabricação, incluindo o limite. Exigem-se quatro ou mais portas e ar-condicionado. Aprovar o veículo não aprova o motorista.
+
+## Teste integrado
+
+Use banco **exclusivo e descartável** com nome terminado em `_test`. A suíte grava cadastros fictícios e regras municipais sintéticas. Inicie o backend como acima apontando FAIRGO_DB_URL para esse banco. Em outro terminal configure PGHOST, PGPORT, PGDATABASE, PGUSER e, se necessário, PGPASSWORD para o mesmo banco. A conta de teste deve poder provisionar regras e credenciais. Defina PSQL com o caminho do executável se ele estiver fora do Path.
+
+```powershell
+$env:FAIRGO_TEST_URL = 'http://127.0.0.1:8080'
+python backend/tests/test_validacao.py
+```
+
+## Operação e dependências externas
+
+Imagens ficam em PostgreSQL como bytes cifrados com AES-256-GCM, nonce aleatório por gravação e vínculo autenticado ao cadastro e tipo. O servidor identifica, decodifica e recodifica JPEG, descartando metadados e o nome original. Downloads administrativos usam no-store. Dados completos de CNH, CRLV e laudos permanecem dentro da imagem. Não registrar tokens, imagens ou corpos multipart nos logs.
+
+Em produção use HTTPS, banco em rede privada, cofre de segredos e backup testado. Aplique schema.sql e validacao.sql com credencial de migração e defina SPRING_SQL_INIT_MODE=never na aplicação. Conceda à conta da API SELECT em credenciais_admin e limites_municipais, SELECT/INSERT em decisoes_cadastro, uso na sequência e apenas as permissões de leitura e gravação necessárias nas tabelas de cadastro. Restrinja provisionamento e alteração do histórico a funções operacionais separadas.
+
+A conferência é manual. Autenticidade, suspensão de CNH, situação oficial de CRLV, emissão de antecedentes e confirmação do laudo dependem de consulta ao emissor ou de integração autorizada. Também ficam para operação posterior atualização oficial por município, antivírus externo, política de retenção e revalidação anual agendada. O status reflete a última decisão registrada.
