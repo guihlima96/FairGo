@@ -41,13 +41,13 @@ Prefixo: `/api/admin/validacao`. Substitua `{alvo}` por `MOTORISTA` ou `VEICULO`
 | Método e caminho relativo | Operação |
 |---|---|
 | PUT /VEICULO/{id}/dados | JSON com portas (inteiro), arCondicionado (booleano), anoFabricacao e municipio (código IBGE de 7 dígitos). |
-| PUT /{alvo}/{id}/documentos/{tipo} | multipart/form-data. Campo arquivo com foto JPEG legível de até 4 MiB e 8 milhões de pixels. Para CNH, enviar ear e validade (AAAA-MM-DD). Para os demais, validade quando aplicável. |
+| PUT /{alvo}/{id}/documentos/{tipo} | multipart/form-data. Campo arquivo com documento legível de até 4 MiB e 8 milhões de pixels. Para CNH, enviar ear e validade (AAAA-MM-DD). Para os demais, validade quando aplicável. |
 | GET /{alvo}/{id} | Situação, dados técnicos e metadados para revisão, incluindo UUID de cada versão atual. |
 | GET /{alvo}/{id}/documentos/{revisao} | Download autenticado de uma imagem para conferência. |
 | POST /{alvo}/{id}/decisoes | JSON com situacao, motivo e, para aprovação, documentosConferidos com os UUIDs de todas as imagens atuais verificadas. |
 | GET /{alvo}/{id}/historico | Decisões e reaberturas em ordem, com motivo, data do servidor e identidade do token. |
 
-Cada motorista exige CNH com EAR e validade vigente, antecedentes e toxicológico. O CRLV pertence ao veículo. A pessoa revisora deve verificar legibilidade, titularidade, correspondência de placa, EAR e conteúdo de cada comprovante antes de incluir sua versão. Descreva o motivo sem números de documento, resultados médicos ou outros dados pessoais. Exemplo de rejeição:
+Cada motorista exige CNH definitiva com EAR e validade vigente, antecedentes, FOTO_PERFIL e RESIDENCIA. O toxicológico é facultativo. CNH, CRLV, antecedentes e residência aceitam JPEG e PDF. Foto e toxicológico aceitam JPEG. O limite de 4 MiB vale por envio e o limite de pixels se aplica às imagens. Na aprovação de motorista, envie identidadeConferida=true e os UUIDs das revisões obrigatórias. O painel permite baixar o PDF para leitura. Confira o nome na CNH, a foto frontal própria e a titularidade do comprovante de residência. O histórico registra as revisões conferidas. A verificação automatizada de veracidade e autenticidade junto aos emissores é uma evolução futura. O CRLV pertence ao veículo. A pessoa revisora deve verificar legibilidade, titularidade, correspondência de placa, EAR e conteúdo de cada comprovante antes de incluir sua versão. Descreva o motivo sem números de documento, resultados médicos ou outros dados pessoais. Exemplo de rejeição:
 
 ```json
 {"situacao":"REJEITADO","motivo":"Imagem ilegível. Solicitar nova foto."}
