@@ -6,6 +6,7 @@ import string
 import unittest
 from concurrent.futures import ThreadPoolExecutor
 from threading import Barrier
+from uuid import UUID
 
 from test_driver import cadastro
 from test_validacao import TOKEN, DIGEST, call, decidir, enviar_arquivo, pdf_teste, request, sql
@@ -38,6 +39,32 @@ class DocumentosDriver(unittest.TestCase):
         cnh = enviar_arquivo(rota + "CNH", token, {"ear": "true", "validade": "2099-01-01"})["id"]
         return [cnh] + [enviar_arquivo(rota + tipo, token)["id"]
                         for tipo in ("ANTECEDENTES", "FOTO_PERFIL", "RESIDENCIA")]
+
+    def test_contrato_cadastro_e_placa(self):
+        dados = cadastro()
+        admin = call("usuarios", 201, {"nome": dados["nome"], "email": dados["email"],
+                                       "perfil": "MOTORISTA"}, "POST")
+        dados = cadastro()
+        driver = request("/api/driver/contas", 201, dados, "POST")
+        token = request("/api/driver/sessoes", 200, {"identificador": driver["id"],
+                        "senha": dados["senha"]}, "POST")["token"]
+
+        respostas = [admin, driver]
+        for rota, credencial, campos in [
+            ("/api/admin/veiculos", TOKEN, {"motoristaId": admin["id"]}),
+            ("/api/driver/veiculos", token, {}),
+        ]:
+            placa = self.placa()
+            placa = placa[:4] + "A" + placa[5:]
+            formatada = placa[:3].lower() + "-" + placa[3:].lower()
+            request(rota, 400, {**campos, "placa": "INVALIDA"}, "POST", credencial)
+            respostas.append(request(rota, 201, {**campos, "placa": formatada}, "POST", credencial))
+            request(rota, 409, {**campos, "placa": placa}, "POST", credencial)
+
+        for resposta in respostas:
+            self.assertEqual(set(resposta), {"id", "situacao"})
+            self.assertEqual(str(UUID(resposta["id"])), resposta["id"])
+            self.assertEqual(resposta["situacao"], "PENDENTE")
 
     def test_veiculos_e_revisoes_por_titular(self):
         motorista, token = self.motorista()

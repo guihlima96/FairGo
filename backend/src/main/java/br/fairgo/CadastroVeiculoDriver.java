@@ -17,7 +17,7 @@ import static org.springframework.http.HttpStatus.*;
 @RestController
 @RequestMapping("/api/driver")
 class CadastroVeiculoDriver {
-    record NovoVeiculo(@NotNull @Pattern(regexp=CadastroAdmin.PLACA) String placa) {}
+    record NovoVeiculo(@NotNull @Pattern(regexp=Placa.PADRAO) String placa) {}
     record Veiculo(UUID id, String placa, String situacao, Dados dados, UUID revisaoCrlv) {}
 
     private final CadastroCompartilhado cadastros;
@@ -40,7 +40,7 @@ class CadastroVeiculoDriver {
 
     @PostMapping("/veiculos")
     @ResponseStatus(CREATED)
-    public CadastroAdmin.Cadastro cadastrar(@Valid @RequestBody NovoVeiculo veiculo, Principal sessao) {
+    public ResultadoCadastro cadastrar(@Valid @RequestBody NovoVeiculo veiculo, Principal sessao) {
         return cadastros.criarVeiculo(UUID.fromString(sessao.getName()), veiculo.placa());
     }
 

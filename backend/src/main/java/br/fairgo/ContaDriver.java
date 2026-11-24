@@ -56,7 +56,7 @@ class ContaDriver {
 
     @PostMapping("/contas")
     @ResponseStatus(CREATED)
-    public CadastroAdmin.Cadastro cadastrar(@Valid @RequestBody Cadastro dados, HttpServletRequest req) {
+    public ResultadoCadastro cadastrar(@Valid @RequestBody Cadastro dados, HttpServletRequest req) {
         limitar("cadastro:" + req.getRemoteAddr(), 20);
         String cpf = dados.cpf().replace(".", "").replace("-", "");
         if (!cpf.matches("[0-9]{11}")) throw new ResponseStatusException(BAD_REQUEST);
@@ -75,7 +75,7 @@ class ContaDriver {
         } catch (DuplicateKeyException ex) {
             throw new ResponseStatusException(CONFLICT);
         }
-        return new CadastroAdmin.Cadastro(id, "PENDENTE");
+        return new ResultadoCadastro(id, "PENDENTE");
     }
 
     @PostMapping("/sessoes")
