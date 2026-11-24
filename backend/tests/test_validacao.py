@@ -38,7 +38,8 @@ def request(path, status, data=None, method="GET", token=None, content_type="app
     except urllib.error.HTTPError as error:
         response = error
     with response:
-        assert response.status == status, (method, path, response.status, status)
+        expected = status if isinstance(status, tuple) else (status,)
+        assert response.status in expected, (method, path, response.status, status)
         body = response.read()
         if body and response.headers.get_content_type() == "application/json":
             return json.loads(body)

@@ -82,3 +82,33 @@ Todas as rotas abaixo exigem Bearer Driver. O servidor deriva o motorista da ses
 Os envios retornam a revisão (id, tipo, validade e ear). A fila e as decisões continuam no Admin. Substituir uma evidência depois de decisão reabre apenas o cadastro afetado e registra o responsável como driver:<UUID>. A conversão ocorre fora da transação e a gravação revalida titularidade e estado sob bloqueio.
 
 **Pendências antes da exposição pública.** O backend recebe o JPEG da foto e não atesta captura pela câmera. O aplicativo deverá realizar essa captura. Seguem pendentes verificação dos contatos, validação de autenticidade com emissor, política de retenção e reavaliação de aprovações antigas. Revisar cotas de upload, concorrência e isolamento do conversor no ambiente de produção. A sanitização descarta assinaturas digitais e os testes fictícios não substituem os ensaios de legibilidade e latência com documentos reais autorizados.
+
+## Etapa 5.4 — Consulta consolidada
+
+`GET /api/driver/me/situacao` usa exclusivamente o titular da sessão Driver. Responde 200 com uma leitura consistente do cadastro e 401 para sessão ausente, inválida ou credencial do Admin.
+
+| Campo | Interpretação |
+|---|---|
+| motorista | ID próprio, análise atual, indicadores reais de verificação de nome, e-mail e celular e lista de documentos pessoais. Um indicador falso significa verificação pendente. |
+| motorista.documentos | Cada item contém tipo, obrigatorio, revisaoAtual, validade e ear. Revisão nula indica ausência. Um obrigatório ausente precisa ser enviado. O toxicológico é facultativo. |
+| veiculos | Uma entrada por veículo do titular com id, placa, análise, dadosTecnicosInformados e metadados do CRLV. Lista vazia indica ausência de veículo. |
+| analise | Situação administrativa PENDENTE, APROVADO ou REJEITADO. Apenas REJEITADO recebe orientação pública fixa. A reabertura remove essa orientação. |
+| preElegibilidade | motoristaEVeiculoAprovados indica motorista aprovado com ao menos um veículo próprio aprovado. Conta decisões administrativas vigentes, inclusive legadas. autorizadoParaCorridas permanece falso nesta etapa. |
+
+A consulta não reavalia decisões nem atesta autenticidade, validade atual ou identidade. O cliente pode indicar o documento ausente pela combinação de obrigatorio e revisaoAtual. A aprovação administrativa não altera os indicadores de verificação.
+
+**Proposta de comunicação da rejeição.** Exibir “Revise os dados e documentos deste cadastro.” Para informar uma causa específica em etapa futura, propor um catálogo fechado de códigos públicos com mensagens previamente revisadas e seleção explícita pelo Admin. Decisões antigas ou sem código recebem a orientação genérica. O texto livre, os responsáveis e o histórico continuam exclusivos do Admin.
+
+O [registro de pendências do Driver](pendencias/driver-admin.md) acompanha câmera, autenticidade, verificação de contatos e aprovações antigas. Os [itens de operação e segurança](pendencias/operacao-seguranca.md) incluem cotas de upload, isolamento do conversor, retenção e validação com documentos reais antes da exposição pública.
+
+### Estados da pré-elegibilidade
+
+| Motorista | Veículos do titular | motoristaEVeiculoAprovados | autorizadoParaCorridas |
+|---|---|---|---|
+| PENDENTE ou REJEITADO | Qualquer combinação | false | false |
+| APROVADO | Nenhum, ou todos PENDENTE ou REJEITADO | false | false |
+| APROVADO | Um ou mais APROVADO, independentemente dos demais | true | false |
+
+Cada CRLV pertence ao veículo indicado na rota. A gravação confere o titular sob bloqueio e substitui a revisão pela chave veículo e tipo. A leitura associa o CRLV ao mesmo veículo e lista somente veículos do titular. Tipos pessoais ainda ausentes do contrato são omitidos desta consulta durante uma atualização de versões.
+
+O resumo não seleciona veículo de trabalho. Para uma etapa futura, a proposta é o motorista escolher um veículo próprio e o backend avaliar aquele vínculo e as condições operacionais no momento de autorizar corridas. A escolha, a troca e os critérios adicionais dependem da decisão PA-08.
