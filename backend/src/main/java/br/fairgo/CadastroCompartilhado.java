@@ -60,7 +60,7 @@ class CadastroCompartilhado {
         return rows.get(0);
     }
 
-    CadastroAdmin.Cadastro criarVeiculo(UUID motorista, String valor) {
+    ResultadoCadastro criarVeiculo(UUID motorista, String valor) {
         UUID id = UUID.randomUUID();
         String placa = valor.replace("-", "").toUpperCase(Locale.ROOT);
         int inseridos = db.update("""
@@ -70,7 +70,7 @@ class CadastroCompartilhado {
         if (inseridos == 0) {
             throw new ResponseStatusException(UNPROCESSABLE_ENTITY, "Motorista inválido");
         }
-        return new CadastroAdmin.Cadastro(id, "PENDENTE");
+        return new ResultadoCadastro(id, "PENDENTE");
     }
 
     @Transactional
