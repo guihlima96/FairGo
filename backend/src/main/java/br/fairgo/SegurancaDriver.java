@@ -47,7 +47,10 @@ class SegurancaDriver {
                 .exceptionHandling(c -> c.authenticationEntryPoint((req,res,e) -> res.setStatus(401)))
                 .authorizeHttpRequests(a -> a.requestMatchers(HttpMethod.POST, "/api/driver/contas",
                         "/api/driver/sessoes", "/api/driver/recuperacao", "/api/driver/recuperacao/confirmacao").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/driver/me").hasRole("DRIVER")
+                        .requestMatchers(HttpMethod.POST, "/api/driver/veiculos").hasRole("DRIVER")
+                        .requestMatchers(HttpMethod.PUT, "/api/driver/me/documentos/*", "/api/driver/veiculos/*/dados",
+                                "/api/driver/veiculos/*/crlv").hasRole("DRIVER")
+                        .requestMatchers(HttpMethod.GET, "/api/driver/me", "/api/driver/veiculos", "/api/driver/veiculos/*").hasRole("DRIVER")
                         .requestMatchers(HttpMethod.DELETE, "/api/driver/sessoes/atual").hasRole("DRIVER")
                         .anyRequest().denyAll()).build();
     }

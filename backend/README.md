@@ -105,3 +105,7 @@ Com o backend iniciado, abra http://127.0.0.1:8080/admin/index.html. Informe o t
 Informe o token e clique em **Carregar pendentes**. A fila identifica motoristas pelo nome e veículos pela placa. Selecione o cadastro e abra os documentos para conferência. A imagem fica disponível dentro da página durante a análise. Para aprovar, marque os documentos conferidos. Para ambas as decisões, informe uma justificativa e confirme. A fila, a situação e o histórico são recarregados após a decisão. Cadastros já decididos continuam disponíveis em **Consultar por ID**.
 
 O GitHub Actions também executa tests/test_painel.py em Chrome com cadastros e JPEG fictícios no banco exclusivo da suíte. O teste simula rejeição de motorista e aprovação de veículo.
+
+## Veículos e documentos pelo Driver
+
+O [contrato da Etapa 5.3](../docs/etapa-5-driver-admin.md) descreve as rotas autenticadas de veículos e documentos. Elas usam as mesmas tabelas, permissões de gravação, cofre e histórico do fluxo administrativo existente. Para testar a integração com o banco exclusivo, execute `python backend/tests/test_driver_documentos.py` na raiz, após iniciar o backend.

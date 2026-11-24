@@ -13,17 +13,21 @@ import org.springframework.web.server.ResponseStatusException;
 @RestController
 @RequestMapping("/api/admin")
 class CadastroAdmin {
+    static final String PLACA = "(?i)[a-z]{3}-?[0-9][a-z0-9][0-9]{2}";
     enum Perfil { PASSAGEIRO, MOTORISTA }
     record Usuario(@NotBlank @Size(max = 160) String nome,
                    @NotBlank @Email @Size(max = 254) String email,
                    @NotNull Perfil perfil) {}
     record Veiculo(@NotNull UUID motoristaId,
-                   @NotNull @Pattern(regexp = "(?i)[a-z]{3}-?[0-9][a-z0-9][0-9]{2}") String placa) {}
+                   @NotNull @Pattern(regexp = PLACA) String placa) {}
     record Cadastro(UUID id, String situacao) {}
 
     private final JdbcTemplate db;
 
-    CadastroAdmin(JdbcTemplate db) {
+    private final CadastroCompartilhado cadastros;
+
+    CadastroAdmin(JdbcTemplate db, CadastroCompartilhado cadastros) {
+        this.cadastros = cadastros;
         this.db = db;
     }
 
@@ -40,16 +44,7 @@ class CadastroAdmin {
     @PostMapping("/veiculos")
     @ResponseStatus(HttpStatus.CREATED)
     Cadastro veiculo(@Valid @RequestBody Veiculo veiculo) {
-        UUID id = UUID.randomUUID();
-        String placa = veiculo.placa().replace("-", "").toUpperCase(Locale.ROOT);
-        int inseridos = db.update("""
-                INSERT INTO veiculos (id, motorista_id, placa)
-                SELECT ?, id, ? FROM usuarios WHERE id = ? AND perfil = 'MOTORISTA'
-                """, id, placa, veiculo.motoristaId());
-        if (inseridos == 0) {
-            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "Motorista inválido");
-        }
-        return new Cadastro(id, "PENDENTE");
+        return cadastros.criarVeiculo(veiculo.motoristaId(), veiculo.placa());
     }
 
     @ExceptionHandler(DuplicateKeyException.class)
