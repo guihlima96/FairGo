@@ -127,6 +127,22 @@ Proposta de contrato para o Driver autenticado. O servidor identifica a conta pe
 
 **Entrega e operação pendentes.** Antes de ativar a emissão pública, decidir provedores e remetentes, tratamento de falhas ambíguas, idempotência da entrega e limites por destino, origem e orçamento global. Planejar invalidação atômica do indicador e dos desafios em qualquer futuro fluxo de troca do contato. A chave deve vir do gerenciador de segredos. A rotação invalida desafios em trânsito. Não registrar códigos, destinos ou corpos de confirmação. Definir expurgo dos desafios expirados e retenção de auditoria.
 
-**Conferência administrativa proposta.** Registrar evento do titular com resultado, operador autenticado, data do servidor, revisão da CNH e da foto e referência à versão do nome cadastrado. Vincular a confirmação do nome à evidência e à comparação documental daquela revisão. Registrar correções ou divergências em eventos separados. Uma substituição da evidência vinculada ou alteração do nome deverá invalidar a conferência correspondente. O checkbox e as decisões históricas do Admin, por si, não atualizam nomeVerificado. Métodos adicionais de prova de identidade e mensagens públicas dependem de decisão.
+**Proposta de origem (implementação detalhada abaixo).** Registrar evento do titular com resultado, operador autenticado, data do servidor, revisão da CNH e da foto e referência à versão do nome cadastrado. Vincular a confirmação do nome à evidência e à comparação documental daquela revisão. Registrar correções ou divergências em eventos separados. Uma substituição da evidência vinculada ou alteração do nome deverá invalidar a conferência correspondente. O checkbox e as decisões históricas do Admin, por si, não atualizam nomeVerificado. Métodos adicionais de prova de identidade e mensagens públicas dependem de decisão.
 
 **Bloqueio futuro de aprovação.** Proposta de política versionada atribuída pelo servidor a novos cadastros a partir de um corte explícito, incluindo os iniciados pelo Admin. Na transação de aprovação, conferir as revisões e o nome atuais e ambos os contatos verificados. Se faltar requisito, responder 422 com a situação ainda pendente. Definir previamente o tratamento de contas legadas, pendentes no corte e cadastros administrativos sem conta Driver. A ativação depende de canais operacionais e da aprovação dessa política. Esta entrega preserva a regra administrativa atual e não habilita corridas.
+
+## Conferência administrativa de identidade e nome
+
+No painel, o administrador abre e marca a CNH e a foto de perfil, compara ambas com o nome exibido, escolhe CONFERE ou DIVERGENTE e confirma o registro. Essa ação também está disponível para cadastros já decididos. A decisão cadastral e seu checkbox continuam independentes.
+
+| Operação administrativa em /api/admin/validacao/MOTORISTA/{id} | Contrato |
+|---|---|
+| GET do detalhe | nomeMotorista e versaoNome identificam o nome apresentado. documentos contém os UUIDs das revisões. |
+| POST /conferencias-identidade | JSON com versaoNome, revisaoCnh, revisaoFoto e resultado. Retorna 201. Referências ausentes no corpo ou resultado inválido retornam 400. Revisão ausente no cadastro, de outro titular, substituída ou versão do nome desatualizada retorna 409. Atualizar a consulta antes de repetir. |
+| GET /conferencias-identidade | Histórico do titular em ordem decrescente de sequência, incluindo nome conferido, versão, revisões, resultado e autoria (responsavel e data). Titular inexistente ou passageiro retorna 404. As duas rotas exigem token Admin. |
+
+O servidor registra o responsável da sessão administrativa e o instante do PostgreSQL. Cada registro explícito acrescenta um evento. A sequência define o último parecer, inclusive quando o mesmo conjunto de evidências recebe um parecer divergente. Os UUIDs históricos continuam disponíveis após substituição, sem duplicar imagens.
+
+Em GET /api/driver/me e GET /api/driver/me/situacao, nomeVerificado depende exclusivamente do último evento CONFERE correspondente ao nome e às duas revisões atuais. A consulta consolidada também expõe motorista.identidadeDocumentalVerificada com o mesmo valor, pois a conferência é conjunta. O indicador antigo isolado de contas_driver e decisões históricas não constituem evidência. A troca de CNH ou foto e qualquer mudança efetiva do nome invalidam a conferência. Retornar ao nome anterior requer nova conferência. E-mail, celular, situação administrativa e autorização para corridas conservam suas regras.
+
+A conferência registra comparação visual humana. Autenticidade junto ao emissor, biometria, retenção do nome histórico, política para divergências e eventual obrigatoriedade na aprovação precisam de decisão própria.

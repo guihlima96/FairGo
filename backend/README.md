@@ -117,3 +117,9 @@ O [contrato da Etapa 5.3](../docs/etapa-5-driver-admin.md) descreve as rotas aut
 ### Verificação de contatos do Driver
 
 Aplicar a atualização aditiva de `driver.sql` com a conta de migração. A conta da API precisa de SELECT, INSERT, UPDATE e DELETE em `desafios_contato_driver` e UPDATE nas colunas `email_verificado` e `celular_verificado` de `contas_driver`. A confirmação também bloqueia as linhas da conta e do usuário, usando as permissões de bloqueio já necessárias à análise administrativa. A variável opcional `FAIRGO_CONTACT_KEY` contém 32 bytes aleatórios em Base64, distintos da chave documental. A ausência dessa chave mantém a confirmação indisponível. A configuração de uma chave, por si só, não ativa envios. O contrato, os limites técnicos e as decisões de ativação estão na [Etapa 5](../docs/etapa-5-driver-admin.md#verificação-de-contatos-e-identidade--da-02).
+
+### Conferência de identidade
+
+Aplicar `identidade.sql` após os scripts de cadastro, validação e Driver, com a conta de migração. A tabela é aditiva. A versão inicial do nome é 1 em cadastros novos e anteriores. O gatilho incrementa a versão quando o nome muda. Os leitores de /me e /me/situacao passam a usar a projeção `identidade_motorista_atual`. A conta de execução requer SELECT na projeção, SELECT e INSERT em `conferencias_identidade` e acesso à sequência de inserção conforme os privilégios do banco. Reservar a alteração de esquema e a manutenção da tabela de auditoria à conta de migração. Conservar os privilégios de leitura e bloqueio já usados na validação. Não conceder UPDATE ou DELETE no histórico à conta da API.
+
+A auditoria contém o nome conferido e referências históricas, restritos ao Admin. As consultas Driver devolvem indicadores, sem esses metadados administrativos. O painel permite registrar e rever pareceres na seção de conferência visual. [Contrato da conferência](../docs/etapa-5-driver-admin.md#conferência-administrativa-de-identidade-e-nome)
