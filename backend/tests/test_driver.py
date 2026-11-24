@@ -1,6 +1,8 @@
 """Integração do Driver com identidades fictícias e banco exclusivo."""
 import concurrent.futures
+import base64
 import hashlib
+import hmac
 import json
 import os
 import secrets
@@ -52,6 +54,50 @@ class Driver(unittest.TestCase):
         codigo, corpo = api("POST", "/api/driver/sessoes", {"identificador": identificador, "senha": senha})
         self.assertEqual(codigo, status)
         return corpo["token"] if codigo == 200 else None
+
+    def test_verificacao_sem_provedor(self):
+        dados = cadastro()
+        titular = self.criar(dados)
+        token = self.login(titular, dados["senha"])
+        for canal in ("EMAIL", "CELULAR"):
+            base = "/api/driver/me/verificacoes/" + canal
+            self.assertEqual(api("POST", base + "/solicitacoes")[0], 401)
+            self.assertEqual(api("POST", base + "/solicitacoes", token=token)[0], 503)
+            tentativa = {"desafio": str(uuid.uuid4()), "codigo": "01234567"}
+            self.assertEqual(api("POST", base + "/confirmacao", tentativa)[0], 401)
+            self.assertIn(api("POST", base + "/confirmacao", tentativa, token)[0], (400, 503))
+            self.assertEqual(api("POST", base + "/confirmacao", dict(tentativa, codigo=""), token)[0], 400)
+        status, me = api("GET", "/api/driver/me", token=token)
+        self.assertEqual(status, 200)
+        self.assertFalse(any(me[k] for k in ("nomeVerificado", "emailVerificado", "celularVerificado")))
+        self.assertEqual(sql(f"SELECT count(*) FROM desafios_contato_driver WHERE usuario_id='{titular}'"), "0")
+
+    @unittest.skipUnless(os.environ.get("FAIRGO_CONTACT_KEY"), "Chave efêmera de teste ausente")
+    def test_confirmacao_concorrente_e_isolamento(self):
+        dados, outros = cadastro(), cadastro()
+        titular = self.criar(dados)
+        token = self.login(titular, dados["senha"])
+        outro = self.login(self.criar(outros), outros["senha"])
+        rota = "/api/driver/me/verificacoes/EMAIL/confirmacao"
+        # Fixture local de desafio já emitido. Nenhum canal externo participa do teste.
+        desafio = str(uuid.uuid4())
+        codigo = f"{secrets.randbelow(100_000_000):08d}"
+        mensagem = "\n".join((titular, "EMAIL", desafio, dados["email"], codigo)).encode()
+        chave = base64.b64decode(os.environ["FAIRGO_CONTACT_KEY"])
+        prova = hmac.digest(chave, mensagem, "sha256").hex()
+        sql(f"""INSERT INTO desafios_contato_driver
+            (usuario_id,canal,desafio,prova,expira_em,reenviar_em,fim_janela,emissoes,restantes)
+            VALUES ('{titular}','EMAIL','{desafio}',decode('{prova}','hex'),
+                    now()+interval '10 minutes',now(),now()+interval '1 hour',1,5)""")
+        pedido = {"desafio": desafio, "codigo": codigo}
+        self.assertEqual(api("POST", rota, pedido, outro)[0], 400)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+            respostas = [executor.submit(api, "POST", rota, pedido, token) for _ in range(2)]
+            self.assertEqual(sorted(r.result()[0] for r in respostas), [204, 400])
+        me = api("GET", "/api/driver/me", token=token)[1]
+        self.assertTrue(me["emailVerificado"])
+        self.assertFalse(me["celularVerificado"] or me["nomeVerificado"])
+        self.assertFalse(api("GET", "/api/driver/me", token=outro)[1]["emailVerificado"])
 
     def test_contas(self):
         a, b = cadastro(), cadastro()

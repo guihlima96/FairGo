@@ -113,3 +113,7 @@ O [contrato da Etapa 5.3](../docs/etapa-5-driver-admin.md) descreve as rotas aut
 ### Consulta de situação do Driver
 
 `GET /api/driver/me/situacao` recebe o Bearer Driver e reúne a análise do titular e dos seus veículos. O [contrato REST da Etapa 5.4](../docs/etapa-5-driver-admin.md#etapa-54--consulta-consolidada) especifica os campos, as revisões e a tabela de pré-elegibilidade.
+
+### Verificação de contatos do Driver
+
+Aplicar a atualização aditiva de `driver.sql` com a conta de migração. A conta da API precisa de SELECT, INSERT, UPDATE e DELETE em `desafios_contato_driver` e UPDATE nas colunas `email_verificado` e `celular_verificado` de `contas_driver`. A confirmação também bloqueia as linhas da conta e do usuário, usando as permissões de bloqueio já necessárias à análise administrativa. A variável opcional `FAIRGO_CONTACT_KEY` contém 32 bytes aleatórios em Base64, distintos da chave documental. A ausência dessa chave mantém a confirmação indisponível. A configuração de uma chave, por si só, não ativa envios. O contrato, os limites técnicos e as decisões de ativação estão na [Etapa 5](../docs/etapa-5-driver-admin.md#verificação-de-contatos-e-identidade--da-02).
