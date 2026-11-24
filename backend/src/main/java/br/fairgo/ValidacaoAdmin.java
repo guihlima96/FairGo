@@ -59,9 +59,14 @@ class ValidacaoAdmin {
     @GetMapping("/{alvo}/{id}")
     public Map<String,Object> consultar(@PathVariable Alvo alvo, @PathVariable UUID id) {
         String situacao = cadastros.estado(alvo,id,false);
-        return Map.of("nomeMotorista", alvo == Alvo.MOTORISTA ? db.queryForObject("SELECT nome FROM usuarios WHERE id=?",String.class,id) : "", "situacao",situacao, "documentos",documentos(alvo,id),
+        var detalhe = new LinkedHashMap<String,Object>();
+        detalhe.put("nomeMotorista", "");
+        if (alvo == Alvo.MOTORISTA) detalhe.putAll(db.queryForMap(
+                "SELECT nome AS \"nomeMotorista\", versao_nome AS \"versaoNome\" FROM usuarios WHERE id=?", id));
+        detalhe.putAll(Map.of("situacao",situacao, "documentos",documentos(alvo,id),
                 "dadosVeiculo", alvo == Alvo.VEICULO ? db.queryForList(
-                "SELECT portas, ar_condicionado, ano_fabricacao, municipio FROM dados_veiculo WHERE veiculo_id=?",id) : List.of());
+                "SELECT portas, ar_condicionado, ano_fabricacao, municipio FROM dados_veiculo WHERE veiculo_id=?",id) : List.of()));
+        return detalhe;
     }
 
     private List<Documento> documentos(Alvo alvo, UUID id) {

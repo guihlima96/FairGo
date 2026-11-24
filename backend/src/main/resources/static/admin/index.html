@@ -23,6 +23,11 @@
 <h2 id="titulo"></h2><p id="situacao"></p><p id="dados"></p>
 <h3>Documentos cadastrados</h3><ul id="documentos"></ul>
 <div id="visor" hidden><img id="imagem" alt=""><a id="pdf" hidden download="documento.pdf">Baixar PDF para conferência</a><br><button id="fechar">Fechar documento</button></div>
+<form id="conferencia" hidden><h3>Conferência visual de nome e identidade</h3>
+<p>Compare o nome cadastrado e a foto de perfil com a CNH. Abra e marque as duas evidências acima.</p>
+<label>Resultado <select id="parecer" required><option value="">Selecione</option><option value="CONFERE">Nome e identidade conferem</option><option value="DIVERGENTE">Há divergência</option></select></label>
+<button>Registrar conferência</button><p id="vigencia"></p>
+<details><summary>Histórico de conferências</summary><ul id="conferencias"></ul></details></form>
 <form id="decisao"><div id="identificacao" hidden><label><input type="checkbox" id="identidade"> Conferi o nome com a CNH definitiva com EAR, comparei a foto de perfil com a CNH e confirmei o comprovante em nome do motorista.</label></div><label>Justificativa<textarea id="motivo" maxlength="500" required></textarea></label>
 <button value="APROVADO">Aprovar</button><button class="rejeitar" value="REJEITADO">Rejeitar</button></form>
 <h3>Histórico de decisões</h3><ul id="historico"></ul></section></div>

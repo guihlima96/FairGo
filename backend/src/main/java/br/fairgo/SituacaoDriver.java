@@ -24,7 +24,10 @@ class SituacaoDriver {
         }
     }
     record Motorista(UUID id, Analise analise, boolean nomeVerificado, boolean emailVerificado,
-                     boolean celularVerificado, List<Evidencia> documentos) {}
+                     boolean celularVerificado, List<Evidencia> documentos) {
+        @com.fasterxml.jackson.annotation.JsonProperty
+        public boolean identidadeDocumentalVerificada() { return nomeVerificado; }
+    }
     record Veiculo(UUID id, String placa, Analise analise, boolean dadosTecnicosInformados, Evidencia crlv) {}
     record PreElegibilidade(boolean motoristaEVeiculoAprovados, boolean autorizadoParaCorridas) {
         static PreElegibilidade cadastral(Motorista motorista, List<Veiculo> veiculosProprios) {
@@ -47,8 +50,9 @@ class SituacaoDriver {
         UUID titular = UUID.fromString(sessao.getName());
         var documentos = documentosPessoais(titular);
         var motorista = db.queryForObject("""
-                SELECT u.situacao, c.nome_verificado, c.email_verificado, c.celular_verificado
+                SELECT u.situacao, i.verificada AS nome_verificado, c.email_verificado, c.celular_verificado
                 FROM usuarios u JOIN contas_driver c ON c.usuario_id=u.id
+                JOIN identidade_motorista_atual i ON i.id=u.id
                 WHERE u.id=? AND u.perfil='MOTORISTA'
                 """, (rs, n) -> new Motorista(titular, Analise.de(rs.getString("situacao")),
                         rs.getBoolean("nome_verificado"), rs.getBoolean("email_verificado"),

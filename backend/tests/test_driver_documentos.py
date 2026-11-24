@@ -40,6 +40,97 @@ class DocumentosDriver(unittest.TestCase):
         return [cnh] + [enviar_arquivo(rota + tipo, token)["id"]
                         for tipo in ("ANTECEDENTES", "FOTO_PERFIL", "RESIDENCIA")]
 
+    def test_conferencia_identidade(self):
+        titular, token = self.motorista()
+        _, outro = self.motorista()
+        alvo = "validacao/MOTORISTA/" + titular
+        rota = alvo + "/conferencias-identidade"
+        docs = "/api/driver/me/documentos/"
+        campos = {"ear": "true", "validade": "2099-01-01"}
+        def indicador(esperado):
+            conta = request("/api/driver/me", 200, token=token)
+            consulta = request("/api/driver/me/situacao", 200, token=token)
+            self.assertEqual(conta["nomeVerificado"], esperado)
+            motorista = consulta["motorista"]
+            for campo in ("nomeVerificado", "identidadeDocumentalVerificada"):
+                self.assertEqual(motorista[campo], esperado)
+            self.assertFalse(motorista["emailVerificado"] or motorista["celularVerificado"])
+            self.assertFalse(consulta["preElegibilidade"]["autorizadoParaCorridas"])
+            self.assertEqual(motorista["analise"]["situacao"], "PENDENTE")
+            self.assertNotIn("admin-integracao", str(consulta))
+
+        cnh = enviar_arquivo(docs + "CNH", token, campos)["id"]
+        foto = enviar_arquivo(docs + "FOTO_PERFIL", token)["id"]
+        cadastro_admin = call(alvo, 200)
+        pedido = {"revisaoCnh": cnh, "revisaoFoto": foto, "versaoNome": cadastro_admin["versaoNome"],
+                  "resultado": "CONFERE"}
+        # Mesmo um indicador legado isolado não constitui uma conferência registrada.
+        sql(f"UPDATE contas_driver SET nome_verificado=true WHERE usuario_id='{titular}'")
+        indicador(False)
+        call(rota, 401, pedido, "POST", token=token)
+        call(rota, 401, token=outro)
+        foto_alheia = enviar_arquivo(docs + "FOTO_PERFIL", outro)["id"]
+        call(rota, 409, dict(pedido, revisaoFoto=foto_alheia), "POST")
+        self.assertEqual(call(rota, 200), [])
+        call(rota, 201, pedido, "POST")
+        indicador(True)
+        evento, = call(rota, 200)
+        for campo in pedido:
+            self.assertEqual(evento[campo], pedido[campo])
+        self.assertEqual(evento["nomeConferido"], cadastro_admin["nomeMotorista"])
+        self.assertEqual(evento["autoria"]["responsavel"], "admin-integracao")
+        self.assertTrue(evento["autoria"]["data"])
+        alheio = request("/api/driver/me/situacao?motoristaId=" + titular, 200, token=outro)
+        self.assertFalse(alheio["motorista"]["identidadeDocumentalVerificada"])
+        self.assertNotIn(cnh, str(alheio))
+        enviar_arquivo(docs + "RESIDENCIA", token)
+        indicador(True)
+        call(rota, 201, dict(pedido, resultado="DIVERGENTE"), "POST")
+        indicador(False)
+        call(rota, 201, pedido, "POST")
+        for campo, tipo, extras in (("revisaoCnh", "CNH", campos), ("revisaoFoto", "FOTO_PERFIL", {})):
+            novo = enviar_arquivo(docs + tipo, token, extras)["id"]
+            indicador(False)
+            call(rota, 409, pedido, "POST")
+            pedido[campo] = novo
+            call(rota, 201, pedido, "POST")
+            indicador(True)
+
+        sql(f"UPDATE usuarios SET nome='Nome alterado' WHERE id='{titular}'")
+        indicador(False)
+        sql(f"UPDATE usuarios SET nome='Motorista Fictício' WHERE id='{titular}'")
+        indicador(False)
+        self.assertEqual(call(alvo, 200)["versaoNome"], pedido["versaoNome"] + 2)
+        call(rota, 409, pedido, "POST")
+        self.assertEqual(call(rota, 200)[-1], evento)
+
+    def test_conferencia_simultanea_com_substituicao(self):
+        titular, token = self.motorista()
+        alvo = "validacao/MOTORISTA/" + titular
+        rota = alvo + "/conferencias-identidade"
+        docs = "/api/driver/me/documentos/"
+        cnh = enviar_arquivo(docs + "CNH", token, {"ear":"true", "validade":"2099-01-01"})["id"]
+        foto = enviar_arquivo(docs + "FOTO_PERFIL", token)["id"]
+        pedido = {"revisaoCnh": cnh, "revisaoFoto": foto, "versaoNome": call(alvo, 200)["versaoNome"],
+                  "resultado": "CONFERE"}
+        inicio = Barrier(2, timeout=10)
+        def registrar():
+            inicio.wait()
+            call(rota, (201, 409), pedido, "POST")
+        def substituir():
+            inicio.wait()
+            return enviar_arquivo(docs + "FOTO_PERFIL", token)["id"]
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            registro = executor.submit(registrar)
+            nova = executor.submit(substituir).result()
+            registro.result()
+        self.assertFalse(request("/api/driver/me", 200, token=token)["nomeVerificado"])
+        eventos = call(rota, 200)
+        self.assertIn([e["revisaoFoto"] for e in eventos], ([], [foto]))
+        call(rota, 409, pedido, "POST")
+        call(rota, 201, dict(pedido, revisaoFoto=nova), "POST")
+        self.assertTrue(request("/api/driver/me", 200, token=token)["nomeVerificado"])
+
     def test_contrato_cadastro_e_placa(self):
         dados = cadastro()
         admin = call("usuarios", 201, {"nome": dados["nome"], "email": dados["email"],

@@ -20,6 +20,8 @@ function limparDetalhe() {
     el("resultado").hidden = true;
     el("documentos").replaceChildren();
     el("historico").replaceChildren();
+    el("conferencias").replaceChildren();
+    el("conferencia").reset();
     el("motivo").value = "";
 }
 function limpar() {
@@ -50,7 +52,7 @@ async function api(caminho, opcoes = {}) {
     if (!resposta.ok) {
         if (resposta.status === 401) limpar();
         const mensagens = {401: "Confira o token administrativo.", 404: "Cadastro ou documento indisponível. Atualize a consulta.",
-            409: "Este cadastro já recebeu uma decisão. Consulte novamente.",
+            409: "Os dados ou a situação mudaram. Consulte novamente antes de registrar.",
             422: "Confira os documentos atuais e os requisitos de elegibilidade."};
         throw new Error(mensagens[resposta.status] || "Falha na solicitação. Consulte novamente.");
     }
@@ -83,7 +85,19 @@ async function consultar(tipo, id, nome) {
     const rota = tipo + "/" + encodeURIComponent(id);
     const cadastro = await (await api(rota)).json();
     const historico = await (await api(rota + "/historico")).json();
-    selecionado = {tipo, id, nome, rota};
+    selecionado = {tipo, id, nome, rota, versaoNome: cadastro.versaoNome};
+    el("conferencia").hidden = tipo !== "MOTORISTA";
+    if (tipo === "MOTORISTA") {
+        const eventos = await (await api(rota + "/conferencias-identidade")).json();
+        const ultimo = eventos[0];
+        const revisao = tipoDoc => cadastro.documentos.find(d => d.tipo === tipoDoc)?.id;
+        const vigente = ultimo && ultimo.versaoNome === cadastro.versaoNome
+            && ultimo.revisaoCnh === revisao("CNH") && ultimo.revisaoFoto === revisao("FOTO_PERFIL");
+        el("vigencia").textContent = vigente ? "Resultado vigente: " + ultimo.resultado : "Sem conferência vigente.";
+        for (const h of eventos) item("conferencias", [new Date(h.autoria.data).toLocaleString("pt-BR"),
+            h.autoria.responsavel, h.resultado, h.nomeConferido, "versão " + h.versaoNome,
+            "CNH " + h.revisaoCnh, "Foto " + h.revisaoFoto].join(" · "));
+    }
     el("titulo").textContent = cadastro.nomeMotorista || nome;
     el("identidade").checked = false;
     el("identificacao").hidden = tipo !== "MOTORISTA";
@@ -127,7 +141,7 @@ async function consultar(tipo, id, nome) {
             conferir.disabled = false;
             el("aviso").textContent = "Documento aberto.";
         }));
-        if (pendente) {
+        if (pendente || (tipo === "MOTORISTA" && ["CNH", "FOTO_PERFIL"].includes(doc.tipo))) {
             const label = document.createElement("label");
             label.append(conferir, " Conferi este documento");
             linha.append(label);
@@ -151,6 +165,23 @@ el("busca").onsubmit = e => {
     e.preventDefault();
     if (el("token").reportValidity()) executar(() => consultar(el("tipo").value, el("codigo").value,
         nomes[el("tipo").value] + " · " + el("codigo").value));
+};
+el("conferencia").onsubmit = e => {
+    e.preventDefault();
+    const {tipo, id, nome, rota, versaoNome} = selecionado;
+    const marcados = el("documentos").querySelectorAll("input:checked");
+    const revisoes = Object.fromEntries(Array.from(marcados, c => [c.dataset.tipo, c.value]));
+    if (!revisoes.CNH || !revisoes.FOTO_PERFIL) {
+        el("aviso").textContent = "Abra e marque a CNH e a foto comparadas."; return;
+    }
+    const resultado = el("parecer").value;
+    if (!window.confirm("Registrar a conferência visual de " + el("titulo").textContent + "?")) return;
+    executar(async () => {
+        await api(rota + "/conferencias-identidade", {method: "POST", headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({versaoNome, revisaoCnh: revisoes.CNH, revisaoFoto: revisoes.FOTO_PERFIL, resultado})});
+        await consultar(tipo, id, nome);
+        el("aviso").textContent = "Conferência registrada.";
+    });
 };
 el("decisao").onsubmit = e => {
     e.preventDefault();

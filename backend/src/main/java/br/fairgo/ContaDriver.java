@@ -117,8 +117,9 @@ class ContaDriver {
     @GetMapping("/me")
     public MinhaConta minhaConta(Principal titular) {
         return db.queryForObject("""
-                SELECT u.id,u.nome,u.email,u.situacao,c.cpf,c.celular,c.nome_verificado,c.email_verificado,c.celular_verificado
-                FROM usuarios u JOIN contas_driver c ON c.usuario_id=u.id WHERE u.id=?
+                SELECT u.id,u.nome,u.email,u.situacao,c.cpf,c.celular,i.verificada AS nome_verificado,c.email_verificado,c.celular_verificado
+                FROM usuarios u JOIN contas_driver c ON c.usuario_id=u.id
+                JOIN identidade_motorista_atual i ON i.id=u.id WHERE u.id=?
                 """, (rs, n) -> new MinhaConta(rs.getObject("id", UUID.class), rs.getString("nome"),
                         rs.getString("email"), rs.getString("situacao"), rs.getString("cpf"), rs.getString("celular"),
                         rs.getBoolean("nome_verificado"), rs.getBoolean("email_verificado"), rs.getBoolean("celular_verificado")),

@@ -5,7 +5,7 @@ import uuid
 
 from selenium import webdriver
 from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support.ui import Select, WebDriverWait
 from test_validacao import URL, TOKEN, DIGEST, call, upload, sql, pdf_teste
 import os
 
@@ -74,6 +74,19 @@ class Painel(unittest.TestCase):
             self.assertIn("Análise fictícia", campo("historico").text)
             self.assertIn("painel-teste", campo("historico").text)
             self.assertNotIn(descricao, campo("fila").text)
+        self.assertEqual(campo("vigencia").text, "Sem conferência vigente.")
+        for tipo in ("CNH", "FOTO_PERFIL"):
+            linha = campo("documentos").find_element(By.XPATH, ".//li[.//input[@data-tipo='" + tipo + "']]")
+            linha.find_element(By.TAG_NAME, "button").click()
+            espera.until(lambda _: campo("visor").is_displayed())
+            linha.find_element(By.TAG_NAME, "input").click()
+            campo("fechar").click()
+        Select(campo("parecer")).select_by_value("CONFERE")
+        campo("conferencia").find_element(By.TAG_NAME, "button").click()
+        navegador.switch_to.alert.accept()
+        espera.until(lambda _: campo("aviso").text == "Conferência registrada.")
+        self.assertIn("CONFERE", campo("vigencia").text)
+        self.assertIn("APROVADO", campo("situacao").text)
 
 
 if __name__ == "__main__":
