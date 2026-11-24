@@ -21,6 +21,8 @@ Esta é a tecnologia planejada; a presença de implementações ou de uma arquit
 
 ## Documentação
 
+- [Registro de pendências do FairGo](docs/pendencias/README.md)
+
 - [Especificação mestre do FairGo](FAIRGO_SPEC.md) — referência central para escopo, decisões confirmadas e pendências.
 - [Arquitetura](docs/arquitetura.md)
 - [Regras de tarifas](docs/regras-de-tarifas.md)

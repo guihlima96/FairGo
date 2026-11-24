@@ -1,0 +1,11 @@
+# Driver e Admin
+
+| ID | Estado | Pendência e resultado esperado | Origem |
+|---|---|---|---|
+| DA-01 | Implementar | Criar o fluxo do aplicativo Driver para cadastro, veículo, envio de documentos e acompanhamento. Capturar a foto pela câmera durante o cadastro, com revisão e nova tentativa. Definir como comprovar a origem da foto. | [#7](https://github.com/guihlima96/FairGo/pull/7), [#9](https://github.com/guihlima96/FairGo/pull/9) |
+| DA-02 | Definir e implementar | Escolher métodos de verificação do nome, celular e e-mail. Registrar o resultado somente após a confirmação correspondente. | [#6](https://github.com/guihlima96/FairGo/pull/6), [#8](https://github.com/guihlima96/FairGo/pull/8), [#9](https://github.com/guihlima96/FairGo/pull/9) |
+| DA-03 | Definir e implementar | Completar recuperação de acesso com emissão e entrega do token pelo canal verificado, provedor, prazo de validade e procedimento para perda do contato. O consumo de uso único e a revogação de sessões já existem. | [#8](https://github.com/guihlima96/FairGo/pull/8), [Etapa 5](../etapa-5-driver-admin.md) |
+| DA-04 | Decidir | Definir comprovação de titularidade para vincular contas a cadastros administrativos legados e quais informações da decisão do Admin podem aparecer para o motorista. | [#6](https://github.com/guihlima96/FairGo/pull/6), [#8](https://github.com/guihlima96/FairGo/pull/8) |
+| DA-05 | Definir e implementar | Consultar fontes autorizadas para autenticidade, suspensão de CNH, situação de CRLV, emissão de antecedentes e laudo quando aplicável. Decidir tratamento da assinatura digital antes da conversão ou verificação com o emissor por identificador. | [#3](https://github.com/guihlima96/FairGo/pull/3), [#7](https://github.com/guihlima96/FairGo/pull/7), [#9](https://github.com/guihlima96/FairGo/pull/9) |
+| DA-06 | Decidir | Definir se e quando reavaliar aprovações antigas sem os documentos exigidos no fluxo atual. | [#7](https://github.com/guihlima96/FairGo/pull/7), [#9](https://github.com/guihlima96/FairGo/pull/9) |
+| DA-07 | Implementar | Definir a fonte e a atualização dos limites municipais e implementar a revalidação anual agendada de documentos e veículos. | [#3](https://github.com/guihlima96/FairGo/pull/3), [Backend](../../backend/README.md) |
