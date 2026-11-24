@@ -109,3 +109,7 @@ O GitHub Actions também executa tests/test_painel.py em Chrome com cadastros e 
 ## Veículos e documentos pelo Driver
 
 O [contrato da Etapa 5.3](../docs/etapa-5-driver-admin.md) descreve as rotas autenticadas de veículos e documentos. Elas usam as mesmas tabelas, permissões de gravação, cofre e histórico do fluxo administrativo existente. Para testar a integração com o banco exclusivo, execute `python backend/tests/test_driver_documentos.py` na raiz, após iniciar o backend.
+
+### Consulta de situação do Driver
+
+`GET /api/driver/me/situacao` recebe o Bearer Driver e reúne a análise do titular e dos seus veículos. O [contrato REST da Etapa 5.4](../docs/etapa-5-driver-admin.md#etapa-54--consulta-consolidada) especifica os campos, as revisões e a tabela de pré-elegibilidade.

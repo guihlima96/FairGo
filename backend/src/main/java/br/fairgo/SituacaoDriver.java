@@ -14,16 +14,25 @@ import br.fairgo.CadastroCompartilhado.Tipo;
 @RequestMapping("/api/driver/me")
 class SituacaoDriver {
     record Evidencia(Tipo tipo, boolean obrigatorio, UUID revisaoAtual, LocalDate validade, Boolean ear) {}
-    record Analise(String situacao, String orientacaoPublica) {
+    enum Estado { PENDENTE, APROVADO, REJEITADO }
+
+    record Analise(Estado situacao, String orientacaoPublica) {
         static Analise de(String situacao) {
-            return new Analise(situacao, "REJEITADO".equals(situacao)
+            Estado estado = Estado.valueOf(situacao);
+            return new Analise(estado, estado == Estado.REJEITADO
                     ? "Revise os dados e documentos deste cadastro." : null);
         }
     }
     record Motorista(UUID id, Analise analise, boolean nomeVerificado, boolean emailVerificado,
                      boolean celularVerificado, List<Evidencia> documentos) {}
     record Veiculo(UUID id, String placa, Analise analise, boolean dadosTecnicosInformados, Evidencia crlv) {}
-    record PreElegibilidade(boolean motoristaEVeiculoAprovados, boolean autorizadoParaCorridas) {}
+    record PreElegibilidade(boolean motoristaEVeiculoAprovados, boolean autorizadoParaCorridas) {
+        static PreElegibilidade cadastral(Motorista motorista, List<Veiculo> veiculosProprios) {
+            boolean parAprovado = motorista.analise().situacao() == Estado.APROVADO
+                    && veiculosProprios.stream().anyMatch(v -> v.analise().situacao() == Estado.APROVADO);
+            return new PreElegibilidade(parAprovado, false);
+        }
+    }
     record Resposta(Motorista motorista, List<Veiculo> veiculos, PreElegibilidade preElegibilidade) {}
 
     private final JdbcTemplate db;
@@ -54,9 +63,7 @@ class SituacaoDriver {
                         Analise.de(rs.getString("situacao")), rs.getBoolean("informado"),
                         new Evidencia(Tipo.CRLV, true, rs.getObject("revisao", UUID.class),
                                 rs.getObject("validade", LocalDate.class), null)), titular);
-        boolean parAprovado = "APROVADO".equals(motorista.analise().situacao())
-                && veiculos.stream().anyMatch(v -> "APROVADO".equals(v.analise().situacao()));
-        return new Resposta(motorista, veiculos, new PreElegibilidade(parAprovado, false));
+        return new Resposta(motorista, veiculos, PreElegibilidade.cadastral(motorista, veiculos));
     }
 
     private List<Evidencia> documentosPessoais(UUID titular) {
@@ -67,13 +74,14 @@ class SituacaoDriver {
         }
         documentos.put(Tipo.TOXICOLOGICO, new Evidencia(Tipo.TOXICOLOGICO, false, null, null, null));
         db.query("""
-                SELECT tipo, id, validade, ear FROM documentos_cadastro WHERE motorista_id=?
+                SELECT tipo, id, validade, ear FROM documentos_cadastro
+                WHERE motorista_id=? AND tipo = ANY (?)
                 """, rs -> {
                     Tipo tipo = Tipo.valueOf(rs.getString("tipo"));
                     documentos.put(tipo, new Evidencia(tipo, exigidos.contains(tipo),
                             rs.getObject("id", UUID.class), rs.getObject("validade", LocalDate.class),
                             rs.getObject("ear", Boolean.class)));
-                }, titular);
+                }, titular, documentos.keySet().stream().map(Enum::name).toArray(String[]::new));
         return List.copyOf(documentos.values());
     }
 }

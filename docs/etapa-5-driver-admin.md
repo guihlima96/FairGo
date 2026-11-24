@@ -100,3 +100,15 @@ A consulta não reavalia decisões nem atesta autenticidade, validade atual ou i
 **Proposta de comunicação da rejeição.** Exibir “Revise os dados e documentos deste cadastro.” Para informar uma causa específica em etapa futura, propor um catálogo fechado de códigos públicos com mensagens previamente revisadas e seleção explícita pelo Admin. Decisões antigas ou sem código recebem a orientação genérica. O texto livre, os responsáveis e o histórico continuam exclusivos do Admin.
 
 O [registro de pendências do Driver](pendencias/driver-admin.md) acompanha câmera, autenticidade, verificação de contatos e aprovações antigas. Os [itens de operação e segurança](pendencias/operacao-seguranca.md) incluem cotas de upload, isolamento do conversor, retenção e validação com documentos reais antes da exposição pública.
+
+### Estados da pré-elegibilidade
+
+| Motorista | Veículos do titular | motoristaEVeiculoAprovados | autorizadoParaCorridas |
+|---|---|---|---|
+| PENDENTE ou REJEITADO | Qualquer combinação | false | false |
+| APROVADO | Nenhum, ou todos PENDENTE ou REJEITADO | false | false |
+| APROVADO | Um ou mais APROVADO, independentemente dos demais | true | false |
+
+Cada CRLV pertence ao veículo indicado na rota. A gravação confere o titular sob bloqueio e substitui a revisão pela chave veículo e tipo. A leitura associa o CRLV ao mesmo veículo e lista somente veículos do titular. Tipos pessoais ainda ausentes do contrato são omitidos desta consulta durante uma atualização de versões.
+
+O resumo não seleciona veículo de trabalho. Para uma etapa futura, a proposta é o motorista escolher um veículo próprio e o backend avaliar aquele vínculo e as condições operacionais no momento de autorizar corridas. A escolha, a troca e os critérios adicionais dependem da decisão PA-08.

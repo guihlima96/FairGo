@@ -4,6 +4,8 @@ import os
 import secrets
 import string
 import unittest
+from concurrent.futures import ThreadPoolExecutor
+from threading import Barrier
 
 from test_driver import cadastro
 from test_validacao import TOKEN, DIGEST, call, decidir, enviar_arquivo, pdf_teste, request, sql
@@ -27,6 +29,103 @@ class DocumentosDriver(unittest.TestCase):
         id_ = request("/api/driver/contas", 201, dados, "POST")["id"]
         token = request("/api/driver/sessoes", 200, {"identificador":id_, "senha":dados["senha"]}, "POST")["token"]
         return id_, token
+
+    def placa(self):
+        return "".join(secrets.choice(string.ascii_uppercase) for _ in range(3)) + str(secrets.randbelow(10000)).zfill(4)
+
+    def documentos_obrigatorios(self, token):
+        rota = "/api/driver/me/documentos/"
+        cnh = enviar_arquivo(rota + "CNH", token, {"ear": "true", "validade": "2099-01-01"})["id"]
+        return [cnh] + [enviar_arquivo(rota + tipo, token)["id"]
+                        for tipo in ("ANTECEDENTES", "FOTO_PERFIL", "RESIDENCIA")]
+
+    def test_veiculos_e_revisoes_por_titular(self):
+        motorista, token = self.motorista()
+        _, outro = self.motorista()
+        decidir("validacao/MOTORISTA/" + motorista, self.documentos_obrigatorios(token), 201)
+        situacao = "/api/driver/me/situacao"
+        veiculos = "/api/driver/veiculos"
+        dados = {"portas": 4, "arCondicionado": True, "anoFabricacao": datetime.date.today().year,
+                 "municipio": "0000002"}
+
+        def veiculo_aprovado(dono):
+            veiculo = request(veiculos, 201, {"placa": self.placa()}, "POST", dono)["id"]
+            rota = veiculos + "/" + veiculo
+            request(rota + "/dados", 204, dados, "PUT", dono)
+            crlv = enviar_arquivo(rota + "/crlv", dono)["id"]
+            decidir("validacao/VEICULO/" + veiculo, [crlv], 201)
+            return veiculo, crlv
+
+        alheio, crlv_alheio = veiculo_aprovado(outro)
+        consulta = request(situacao, 200, token=token)
+        self.assertEqual(consulta["motorista"]["analise"]["situacao"], "APROVADO")
+        self.assertEqual(consulta["veiculos"], [])
+        self.assertFalse(any(consulta["preElegibilidade"].values()))
+        self.assertNotIn(crlv_alheio, str(consulta))
+        enviar_arquivo(veiculos + "/" + alheio + "/crlv", token, status=404)
+
+        primeiro, antigo = veiculo_aprovado(token)
+        segundo, intacto = veiculo_aprovado(token)
+        rota = veiculos + "/" + primeiro
+        novo = enviar_arquivo(rota + "/crlv", token)["id"]
+        consulta = request(situacao, 200, token=token)
+        por_id = {v["id"]: v for v in consulta["veiculos"]}
+        self.assertEqual(set(por_id), {primeiro, segundo})
+        self.assertEqual(por_id[primeiro]["crlv"]["revisaoAtual"], novo)
+        self.assertEqual(por_id[primeiro]["analise"]["situacao"], "PENDENTE")
+        self.assertEqual(por_id[segundo]["crlv"]["revisaoAtual"], intacto)
+        self.assertEqual(por_id[segundo]["analise"]["situacao"], "APROVADO")
+        self.assertEqual(consulta["preElegibilidade"],
+                         {"motoristaEVeiculoAprovados": True, "autorizadoParaCorridas": False})
+        self.assertNotIn(antigo, str(consulta))
+        alvo = "validacao/VEICULO/" + primeiro
+        for revisao in (antigo, intacto, crlv_alheio):
+            call(alvo + "/documentos/" + revisao, 404)
+            decidir(alvo, [revisao], 422)
+        self.assertEqual(request(veiculos + "/" + alheio, 200, token=outro)["revisaoCrlv"], crlv_alheio)
+
+    def test_consulta_durante_substituicao_e_decisao(self):
+        motorista, token = self.motorista()
+        alvo = "validacao/MOTORISTA/" + motorista
+        ids = self.documentos_obrigatorios(token)
+        antiga = ids[-1]
+        inicio = Barrier(3, timeout=10)
+
+        def substituir():
+            inicio.wait()
+            return enviar_arquivo("/api/driver/me/documentos/RESIDENCIA", token)["id"]
+
+        def aprovar():
+            inicio.wait()
+            # Se a substituição vencer o bloqueio, a revisão apresentada já estará obsoleta.
+            decidir(alvo, ids, (201, 422))
+
+        def consultar():
+            inicio.wait()
+            return [request("/api/driver/me/situacao", 200, token=token)["motorista"] for _ in range(8)]
+
+        with ThreadPoolExecutor(max_workers=3) as executor:
+            envio = executor.submit(substituir)
+            decisao = executor.submit(aprovar)
+            leituras = executor.submit(consultar)
+            nova = envio.result()
+            decisao.result()
+            amostras = leituras.result()
+
+        historico = call(alvo + "/historico", 200)
+        estados = [h["situacao"] for h in historico]
+        self.assertIn(estados, ([], ["APROVADO", "PENDENTE"]))
+        if historico:
+            self.assertEqual(set(historico[0]["revisoes_conferidas"]), set(ids))
+        for motorista in amostras:
+            doc, = [d for d in motorista["documentos"] if d["tipo"] == "RESIDENCIA"]
+            estado = motorista["analise"]["situacao"]
+            self.assertIn((estado, doc["revisaoAtual"]),
+                          {("PENDENTE", antiga), ("PENDENTE", nova), ("APROVADO", antiga)})
+        final = request("/api/driver/me/situacao", 200, token=token)["motorista"]
+        self.assertEqual(final["analise"]["situacao"], "PENDENTE")
+        residencia, = [d for d in final["documentos"] if d["tipo"] == "RESIDENCIA"]
+        self.assertEqual(residencia["revisaoAtual"], nova)
 
     def test_situacao_e_rejeicao(self):
         titular, token = self.motorista()
@@ -71,7 +170,7 @@ class DocumentosDriver(unittest.TestCase):
         outro_id, outro = self.motorista()
         veiculos = "/api/driver/veiculos"
         docs = "/api/driver/me/documentos/"
-        placa = "".join(secrets.choice(string.ascii_uppercase) for _ in range(3)) + str(secrets.randbelow(10000)).zfill(4)
+        placa = self.placa()
         request(veiculos, 401, {"placa":placa}, "POST")
         request(veiculos, 401, token=TOKEN)
         v = request(veiculos, 201, {"placa":placa,"motoristaId":outro_id}, "POST", dono)["id"]
