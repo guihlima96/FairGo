@@ -48,3 +48,17 @@ Na substituição documental, a aplicação verifica o titular, prepara o arquiv
 ### Conferência visual
 
 O registro de autoria (`AutoriaRegistro`) representa responsável e instante, sem dependência de documentos, papéis HTTP ou regras de mobilidade. `ConferenciaIdentidade` aplica a política específica do motorista e serializa a gravação com o mesmo bloqueio do cadastro usado na substituição documental. Os controladores de consulta compartilham a projeção SQL `identidade_motorista_atual`, que compara a última conferência com as versões atuais. A API administrativa recebe o parecer e fornece a auditoria. A API Driver apresenta apenas o indicador do titular.
+
+### Entrega de SMS e e-mail
+
+Para DA-02 e DA-03, a integração futura terá um contrato interno de entrega por canal. O fluxo de verificação ou recuperação passará uma referência única da mensagem, a finalidade, o destino definido pelo backend e o conteúdo a entregar. O adaptador do fornecedor traduzirá essa solicitação para a API externa e devolverá um resultado comum: aceito, recusado ou indeterminado. A seleção do adaptador ficará na configuração de infraestrutura. Assim, trocar o fornecedor de um canal preserva o cadastro, as regras de verificação e recuperação e os contratos HTTP do Driver.
+
+| Responsabilidade | Onde ficará |
+|---|---|
+| Determinar o destino elegível, emitir e consumir o código ou token, aplicar expiração e limites | Serviço de verificação ou recuperação |
+| Traduzir a mensagem, autenticar a chamada externa e interpretar a resposta do fornecedor | Adaptador de SMS ou e-mail |
+| Decidir se uma falha admite nova tentativa usando a mesma referência e evitando envio duplicado | Coordenação da entrega, fora das regras de cadastro |
+
+A aceitação pelo fornecedor indica apenas que ele recebeu a solicitação. A confirmação do contato continua exigindo a apresentação do código válido. A recuperação segue condicionada ao canal previamente verificado. Um resultado indeterminado exige conciliação antes de repetir o envio ou recorrer a outro fornecedor.
+
+Enquanto a integração estiver pendente, a solicitação de verificação segue respondendo 503 e o pedido de recuperação mantém o 202 uniforme sem envio. Na futura implementação dos adaptadores, os testes de contrato deverão cobrir aceitação, recusa e resposta indeterminada com um adaptador em memória restrito à suíte, destinos fictícios e nenhuma chamada de rede. Códigos, tokens e destinos devem ficar fora de logs. [Candidatos e etapa de contratação](pendencias/driver-admin.md#provedores-candidatos-para-da-02-e-da-03)
