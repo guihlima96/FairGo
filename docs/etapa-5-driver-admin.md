@@ -82,3 +82,21 @@ Todas as rotas abaixo exigem Bearer Driver. O servidor deriva o motorista da ses
 Os envios retornam a revisão (id, tipo, validade e ear). A fila e as decisões continuam no Admin. Substituir uma evidência depois de decisão reabre apenas o cadastro afetado e registra o responsável como driver:<UUID>. A conversão ocorre fora da transação e a gravação revalida titularidade e estado sob bloqueio.
 
 **Pendências antes da exposição pública.** O backend recebe o JPEG da foto e não atesta captura pela câmera. O aplicativo deverá realizar essa captura. Seguem pendentes verificação dos contatos, validação de autenticidade com emissor, política de retenção e reavaliação de aprovações antigas. Revisar cotas de upload, concorrência e isolamento do conversor no ambiente de produção. A sanitização descarta assinaturas digitais e os testes fictícios não substituem os ensaios de legibilidade e latência com documentos reais autorizados.
+
+## Etapa 5.4 — Consulta consolidada
+
+`GET /api/driver/me/situacao` usa exclusivamente o titular da sessão Driver. Responde 200 com uma leitura consistente do cadastro e 401 para sessão ausente, inválida ou credencial do Admin.
+
+| Campo | Interpretação |
+|---|---|
+| motorista | ID próprio, análise atual, indicadores reais de verificação de nome, e-mail e celular e lista de documentos pessoais. Um indicador falso significa verificação pendente. |
+| motorista.documentos | Cada item contém tipo, obrigatorio, revisaoAtual, validade e ear. Revisão nula indica ausência. Um obrigatório ausente precisa ser enviado. O toxicológico é facultativo. |
+| veiculos | Uma entrada por veículo do titular com id, placa, análise, dadosTecnicosInformados e metadados do CRLV. Lista vazia indica ausência de veículo. |
+| analise | Situação administrativa PENDENTE, APROVADO ou REJEITADO. Apenas REJEITADO recebe orientação pública fixa. A reabertura remove essa orientação. |
+| preElegibilidade | motoristaEVeiculoAprovados indica motorista aprovado com ao menos um veículo próprio aprovado. Conta decisões administrativas vigentes, inclusive legadas. autorizadoParaCorridas permanece falso nesta etapa. |
+
+A consulta não reavalia decisões nem atesta autenticidade, validade atual ou identidade. O cliente pode indicar o documento ausente pela combinação de obrigatorio e revisaoAtual. A aprovação administrativa não altera os indicadores de verificação.
+
+**Proposta de comunicação da rejeição.** Exibir “Revise os dados e documentos deste cadastro.” Para informar uma causa específica em etapa futura, propor um catálogo fechado de códigos públicos com mensagens previamente revisadas e seleção explícita pelo Admin. Decisões antigas ou sem código recebem a orientação genérica. O texto livre, os responsáveis e o histórico continuam exclusivos do Admin.
+
+O [registro de pendências do Driver](pendencias/driver-admin.md) acompanha câmera, autenticidade, verificação de contatos e aprovações antigas. Os [itens de operação e segurança](pendencias/operacao-seguranca.md) incluem cotas de upload, isolamento do conversor, retenção e validação com documentos reais antes da exposição pública.

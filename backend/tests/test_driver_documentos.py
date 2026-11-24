@@ -28,6 +28,44 @@ class DocumentosDriver(unittest.TestCase):
         token = request("/api/driver/sessoes", 200, {"identificador":id_, "senha":dados["senha"]}, "POST")["token"]
         return id_, token
 
+    def test_situacao_e_rejeicao(self):
+        titular, token = self.motorista()
+        _, outro = self.motorista()
+        rota = "/api/driver/me/situacao"
+        request(rota, 401)
+        request(rota, 401, token=TOKEN)
+        inicial = request(rota, 200, token=token)
+        motorista = inicial["motorista"]
+        self.assertEqual(motorista["id"], titular)
+        self.assertFalse(any(motorista[k] for k in ("nomeVerificado", "emailVerificado", "celularVerificado")))
+        self.assertEqual(inicial["veiculos"], [])
+        self.assertFalse(any(inicial["preElegibilidade"].values()))
+        docs = motorista["documentos"]
+        self.assertEqual({d["tipo"] for d in docs if d["obrigatorio"]},
+                         {"CNH", "FOTO_PERFIL", "RESIDENCIA", "ANTECEDENTES"})
+        self.assertEqual([d["tipo"] for d in docs if not d["obrigatorio"]], ["TOXICOLOGICO"])
+        self.assertTrue(all(d["revisaoAtual"] is None for d in docs))
+
+        envio = "/api/driver/me/documentos/RESIDENCIA"
+        antiga = enviar_arquivo(envio, token)["id"]
+        decidir("validacao/MOTORISTA/" + titular, [], 201, "REJEITADO")
+        rejeitado = request(rota, 200, token=token)
+        analise = rejeitado["motorista"]["analise"]
+        self.assertEqual(analise, {"situacao": "REJEITADO",
+                                 "orientacaoPublica": "Revise os dados e documentos deste cadastro."})
+        self.assertNotIn("Conferência manual de teste", str(rejeitado))
+        self.assertNotIn("admin-integracao", str(rejeitado))
+        alheio = request(rota + "?motoristaId=" + titular, 200, token=outro)
+        self.assertNotIn(titular, str(alheio))
+        self.assertNotIn(antiga, str(alheio))
+
+        atual = enviar_arquivo(envio, token)["id"]
+        reaberto = request(rota, 200, token=token)["motorista"]
+        self.assertEqual(reaberto["analise"], {"situacao": "PENDENTE", "orientacaoPublica": None})
+        residencia, = [d for d in reaberto["documentos"] if d["tipo"] == "RESIDENCIA"]
+        self.assertEqual(residencia["revisaoAtual"], atual)
+        self.assertNotIn(antiga, str(reaberto))
+
     def test_driver_admin(self):
         id_, dono = self.motorista()
         outro_id, outro = self.motorista()
@@ -47,6 +85,15 @@ class DocumentosDriver(unittest.TestCase):
         enviar_arquivo(docs + "CNH", None, status=401)
         call("validacao/pendentes", 401, token=dono)
         request(veiculos, 409, {"placa":placa}, "POST", outro)
+        situacao = "/api/driver/me/situacao"
+        pendente, = request(situacao, 200, token=dono)["veiculos"]
+        self.assertFalse(pendente["dadosTecnicosInformados"])
+        self.assertTrue(pendente["crlv"]["obrigatorio"])
+        self.assertIsNone(pendente["crlv"]["revisaoAtual"])
+        self.assertEqual(request(situacao, 200, token=outro)["veiculos"], [])
+        decidir("validacao/VEICULO/" + v, [], 201, "REJEITADO")
+        rejeitado, = request(situacao, 200, token=dono)["veiculos"]
+        self.assertEqual(rejeitado["analise"]["situacao"], "REJEITADO")
         request(rota + "/dados", 204, dados, "PUT", dono)
         crlv = enviar_arquivo(rota + "/crlv", dono, image=pdf_teste())["id"]
         self.assertEqual(request(rota, 200, token=dono)["dados"], dados)
@@ -64,7 +111,16 @@ class DocumentosDriver(unittest.TestCase):
         decidir(motorista, ids + [cnh], 201)
         decidir(veiculo, [crlv], 201)
         self.assertEqual(request(rota, 200, token=dono)["situacao"], "APROVADO")
+        aprovado = request(situacao, 200, token=dono)
+        self.assertEqual(aprovado["preElegibilidade"],
+                         {"motoristaEVeiculoAprovados": True, "autorizadoParaCorridas": False})
+        self.assertFalse(aprovado["motorista"]["nomeVerificado"])
+        self.assertTrue(aprovado["veiculos"][0]["dadosTecnicosInformados"])
         novo = enviar_arquivo(rota + "/crlv", dono)["id"]
+        revisado = request(situacao, 200, token=dono)
+        self.assertFalse(revisado["preElegibilidade"]["motoristaEVeiculoAprovados"])
+        self.assertEqual(revisado["veiculos"][0]["crlv"]["revisaoAtual"], novo)
+        self.assertNotIn(crlv, str(revisado))
         self.assertNotEqual(novo, crlv)
         self.assertEqual(request(rota, 200, token=dono)["situacao"], "PENDENTE")
         self.assertEqual(request("/api/driver/me", 200, token=dono)["situacao"], "APROVADO")
@@ -75,8 +131,9 @@ class DocumentosDriver(unittest.TestCase):
         self.assertEqual(request("/api/driver/me", 200, token=dono)["situacao"], "PENDENTE")
         for alvo in (motorista, veiculo):
             historico = call(alvo + "/historico", 200)
-            reabertura, = [h for h in historico if h["situacao"] == "PENDENTE"]
-            self.assertEqual(reabertura["responsavel"], "driver:" + id_)
+            reaberturas = [h for h in historico if h["situacao"] == "PENDENTE"]
+            self.assertEqual(len(reaberturas), 2 if alvo == veiculo else 1)
+            self.assertTrue(all(h["responsavel"] == "driver:" + id_ for h in reaberturas))
 
 
 if __name__ == "__main__":

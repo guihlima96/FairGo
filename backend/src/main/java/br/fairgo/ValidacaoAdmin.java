@@ -93,9 +93,7 @@ class ValidacaoAdmin {
         if (!cadastros.estado(alvo,id,true).equals("PENDENTE")) throw new ResponseStatusException(CONFLICT);
         if (decisao.situacao() == Resultado.APROVADO) {
             var docs = documentos(alvo,id);
-            var exigidos = alvo == Alvo.MOTORISTA
-                    ? EnumSet.of(Tipo.CNH, Tipo.ANTECEDENTES, Tipo.FOTO_PERFIL, Tipo.RESIDENCIA)
-                    : EnumSet.of(Tipo.CRLV);
+            var exigidos = CadastroCompartilhado.obrigatorios(alvo);
             var conferidos = decisao.documentosConferidos();
             var atuais = docs.stream().map(Documento::id).toList();
             if (conferidos == null || !atuais.containsAll(conferidos)

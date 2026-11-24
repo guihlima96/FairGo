@@ -24,6 +24,12 @@ class CadastroCompartilhado {
             this.filtro = filtro;
         }
     }
+    static EnumSet<Tipo> obrigatorios(Alvo alvo) {
+        return alvo == Alvo.MOTORISTA
+                ? EnumSet.of(Tipo.CNH, Tipo.ANTECEDENTES, Tipo.FOTO_PERFIL, Tipo.RESIDENCIA)
+                : EnumSet.of(Tipo.CRLV);
+    }
+
     enum Tipo { CNH, ANTECEDENTES, TOXICOLOGICO, FOTO_PERFIL, RESIDENCIA, CRLV }
     record Dados(@Min(1) @Max(20) int portas, @NotNull Boolean arCondicionado,
                  @Min(1886) int anoFabricacao, @NotNull @Pattern(regexp="[0-9]{7}") String municipio) {}
