@@ -15,10 +15,10 @@ mvn -f backend/pom.xml compile
 mvn -B -f backend/pom.xml verify
 ```
 
-A fase `verify` inclui testes Maven e empacotamento. A validação da Etapa 4 também depende de duas suítes externas. Para reproduzi-las:
+A fase `verify` inclui testes Maven e empacotamento. A suíte JUnit de códigos de contato usa PostgreSQL quando `PGDATABASE` termina em `_test`. Configure as variáveis de teste antes de `verify` para executá-la. Para reproduzir a regressão completa:
 
 1. Prepare PostgreSQL e psql com um banco descartável exclusivo terminado em `_test`. Configure as variáveis JDBC e a chave de documentos conforme o [guia do backend](backend/README.md). Inicie o servidor com `mvn -f backend/pom.xml spring-boot:run`.
-2. Em outro terminal, na raiz, aponte `PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER` e `PGPASSWORD` para o mesmo banco. Configure `PSQL` se necessário. Aguarde o painel responder. Use Python 3 em ambiente virtual e Chrome com driver compatível disponível para Selenium.
+2. Em outro terminal, na raiz, aponte `PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER` e `PGPASSWORD` para o mesmo banco. Configure `PSQL` se necessário. Para a suíte de confirmação HTTP, forneça a mesma `FAIRGO_CONTACT_KEY` temporária (32 bytes aleatórios em Base64) ao servidor e ao processo Python. Aguarde o painel responder. Use Python 3 em ambiente virtual e Chrome com driver compatível disponível para Selenium.
 3. Execute em sequência:
 
 ```powershell
@@ -26,12 +26,14 @@ $env:FAIRGO_TEST_URL = 'http://127.0.0.1:8080'
 python -m pip install selenium==4.29.0
 python backend/tests/test_validacao.py
 python backend/tests/test_painel.py
+1..3 | ForEach-Object { python backend/tests/test_driver.py; if ($LASTEXITCODE) { throw "Falha na suíte Driver" } }
+python backend/tests/test_driver_documentos.py
 ```
 
-A primeira suíte exercita a API com PostgreSQL. A segunda opera o painel em Chrome com dados fictícios. O [workflow Admin](.github/workflows/admin.yml) reproduz a sequência no CI.
+As suítes cobrem a API Admin, o painel Selenium, as contas e contatos Driver e a integração documental Driver/Admin. As três rodadas consecutivas da suíte de contas verificam isolamento e repetibilidade. O [workflow Admin](.github/workflows/admin.yml) reproduz a sequência no CI.
 
 ## Fluxo de trabalho
 
-Consulte [FAIRGO_SPEC.md](FAIRGO_SPEC.md) para regras aprovadas. Registre propostas e pendências explicitamente. Antes de mudanças complexas, identifique os arquivos e contratos afetados. Trabalhe em branch própria, com commits focados no padrão Conventional Commits. Nas mudanças de backend ou painel, valide o build e ambas as suítes de regressão.
+Consulte [FAIRGO_SPEC.md](FAIRGO_SPEC.md) para regras aprovadas. Registre propostas e pendências explicitamente. Antes de mudanças complexas, identifique os arquivos e contratos afetados. Trabalhe em branch própria, com commits focados no padrão Conventional Commits. Nas mudanças de backend ou painel, valide o build e todas as suítes de regressão.
 
 O [plano da Etapa 5](docs/etapa-5-driver-admin.md) descreve a integração proposta para revisão.

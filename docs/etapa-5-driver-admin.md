@@ -112,3 +112,21 @@ O [registro de pendências do Driver](pendencias/driver-admin.md) acompanha câm
 Cada CRLV pertence ao veículo indicado na rota. A gravação confere o titular sob bloqueio e substitui a revisão pela chave veículo e tipo. A leitura associa o CRLV ao mesmo veículo e lista somente veículos do titular. Tipos pessoais ainda ausentes do contrato são omitidos desta consulta durante uma atualização de versões.
 
 O resumo não seleciona veículo de trabalho. Para uma etapa futura, a proposta é o motorista escolher um veículo próprio e o backend avaliar aquele vínculo e as condições operacionais no momento de autorizar corridas. A escolha, a troca e os critérios adicionais dependem da decisão PA-08.
+
+## Verificação de contatos e identidade — DA-02
+
+Proposta de contrato para o Driver autenticado. O servidor identifica a conta pela sessão e obtém o destino do cadastro. Os canais são `EMAIL` e `CELULAR`.
+
+| Operação em /api/driver/me/verificacoes/{canal} | Comportamento |
+|---|---|
+| POST /solicitacoes | Hoje retorna 503 e não cria desafio. Após escolher o provedor, propõe-se 202 com o UUID do desafio depois da aceitação da entrega, 429 para limites e 409 para contato já verificado. O código segue somente para o contato cadastrado. |
+| POST /confirmacao | JSON com desafio (UUID) e codigo (string de oito dígitos). 204 confirma o canal da sessão. 400 para entrada, código ou desafio inválido, substituído, esgotado, vencido ou consumido. Com a chave ausente, a confirmação fica indisponível (503). |
+| Ambas | Sem sessão Driver válida, 401. A resposta não contém o destino nem o código secreto. GET /me e GET /me/situacao mantêm os indicadores independentes. |
+
+**Parâmetros técnicos propostos para revisão.** A emissão interna gera oito dígitos aleatórios, com zero inicial permitido, dez minutos de validade, cinco tentativas, sessenta segundos entre envios e cinco emissões por janela de uma hora por conta e canal. O reenvio substitui o desafio anterior. O banco guarda HMAC-SHA256 com chave separada, vinculado à conta, canal, UUID, destino e código. Uma confirmação válida consome o desafio e marca somente o canal correspondente na mesma transação. Falhas de código consomem uma tentativa. O cadastro e a aprovação documental continuam independentes da emissão. Não há provedor, adaptador de teste em produção nem marcação por solicitação.
+
+**Entrega e operação pendentes.** Antes de ativar a emissão pública, decidir provedores e remetentes, tratamento de falhas ambíguas, idempotência da entrega e limites por destino, origem e orçamento global. Planejar invalidação atômica do indicador e dos desafios em qualquer futuro fluxo de troca do contato. A chave deve vir do gerenciador de segredos. A rotação invalida desafios em trânsito. Não registrar códigos, destinos ou corpos de confirmação. Definir expurgo dos desafios expirados e retenção de auditoria.
+
+**Conferência administrativa proposta.** Registrar evento do titular com resultado, operador autenticado, data do servidor, revisão da CNH e da foto e referência à versão do nome cadastrado. Vincular a confirmação do nome à evidência e à comparação documental daquela revisão. Registrar correções ou divergências em eventos separados. Uma substituição da evidência vinculada ou alteração do nome deverá invalidar a conferência correspondente. O checkbox e as decisões históricas do Admin, por si, não atualizam nomeVerificado. Métodos adicionais de prova de identidade e mensagens públicas dependem de decisão.
+
+**Bloqueio futuro de aprovação.** Proposta de política versionada atribuída pelo servidor a novos cadastros a partir de um corte explícito, incluindo os iniciados pelo Admin. Na transação de aprovação, conferir as revisões e o nome atuais e ambos os contatos verificados. Se faltar requisito, responder 422 com a situação ainda pendente. Definir previamente o tratamento de contas legadas, pendentes no corte e cadastros administrativos sem conta Driver. A ativação depende de canais operacionais e da aprovação dessa política. Esta entrega preserva a regra administrativa atual e não habilita corridas.

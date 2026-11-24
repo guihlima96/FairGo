@@ -38,6 +38,7 @@ jobs:
       - run: python3 -m venv /tmp/fairgo-ui && /tmp/fairgo-ui/bin/pip install selenium==4.29.0
       - name: Iniciar backend e testar a API
         run: |
+          export FAIRGO_CONTACT_KEY=$(openssl rand -base64 32)
           export FAIRGO_DOCUMENT_KEY=$(openssl rand -base64 32)
           java -jar target/backend-*.jar > "$RUNNER_TEMP/backend.log" 2>&1 &
           pid=$!
