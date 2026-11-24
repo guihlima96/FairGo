@@ -23,12 +23,16 @@ def sql(statement):
 
 
 def call(path, status, data=None, method="GET", token=TOKEN, content_type="application/json"):
+    return request("/api/admin/" + path, status, data, method, token, content_type)
+
+
+def request(path, status, data=None, method="GET", token=None, content_type="application/json"):
     headers = {"Content-Type": content_type}
     if token:
         headers["Authorization"] = "Bearer " + token
     if isinstance(data, dict):
         data = json.dumps(data).encode()
-    request = urllib.request.Request(URL + "/api/admin/" + path, data, headers, method=method)
+    request = urllib.request.Request(URL + path, data, headers, method=method)
     try:
         response = urllib.request.urlopen(request, timeout=25)
     except urllib.error.HTTPError as error:
@@ -42,6 +46,10 @@ def call(path, status, data=None, method="GET", token=TOKEN, content_type="appli
 
 
 def upload(path, tipo, fields=None, image=JPEG, status=200):
+    return enviar_arquivo("/api/admin/" + path + "/documentos/" + tipo, TOKEN, fields, image, status)
+
+
+def enviar_arquivo(rota, token, fields=None, image=JPEG, status=200):
     boundary = uuid.uuid4().hex
     chunks = []
     for key, value in (fields or {}).items():
@@ -49,7 +57,7 @@ def upload(path, tipo, fields=None, image=JPEG, status=200):
     chunks.append((f'--{boundary}\r\nContent-Disposition: form-data; name="arquivo"; filename="foto.jpg"\r\n'
                    'Content-Type: image/jpeg\r\n\r\n').encode())
     chunks.extend([image, f'\r\n--{boundary}--\r\n'.encode()])
-    return call(path + "/documentos/" + tipo, status, b"".join(chunks), "PUT",
+    return request(rota, status, b"".join(chunks), "PUT", token,
                 content_type="multipart/form-data; boundary=" + boundary)
 
 

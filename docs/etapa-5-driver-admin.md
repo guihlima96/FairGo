@@ -25,8 +25,8 @@ Para recuperação, propõe-se enviar ao contato previamente verificado um token
 
 A proposta é oferecer operações próprias ao Driver e reutilizar a gravação transacional do backend. O aplicativo não deve receber um token administrativo. Motorista e veículo conservam seus UUIDs e estados no mesmo banco. A fila atual lista pendências e a decisão continua exclusiva do Admin. Não introduzir uma segunda fila ou um segundo histórico.
 
-- **Envio.** Preservar o contrato atual de imagem JPEG de até 4 MiB e 8 milhões de pixels, a recodificação e a cifragem. Para CNH, registrar EAR e validade. Para o veículo, manter portas, ar-condicionado, ano de fabricação e município. Adequar a análise do Driver à regra aprovada para a Etapa 5. Hoje o Admin exige o toxicológico. Na integração, testar aprovação sem esse exame e bloqueio da aprovação enquanto faltar a verificação de antecedentes.
-- **Ampliação prevista.** Planejar o recebimento da foto de perfil e do comprovante de residência, com conferência pelo Admin e registro da revisão. Incluir nos testes PPD, foto reaproveitada da CNH e comprovante em nome de terceiro. O fluxo atual aceita JPEG. Para a Etapa 5, implementar e testar envio e visualização protegida em JPEG e PDF para cada um dos três documentos: CNH digital ou física, CRLV e comprovante de residência. O comprovante de antecedentes criminais também poderá ser enviado em PDF.
+- **Envio.** Preservar o contrato atual de imagem JPEG de até 4 MiB e 8 milhões de pixels, a recodificação e a cifragem. Para CNH, registrar EAR e validade. Para o veículo, manter portas, ar-condicionado, ano de fabricação e município. Adequar a análise do Driver à regra aprovada para a Etapa 5. Desde a PR #7, o Admin permite aprovar sem toxicológico. Na integração, testar aprovação sem esse exame e bloqueio da aprovação enquanto faltar a verificação de antecedentes.
+- **Ampliação prevista.** Planejar o recebimento da foto de perfil e do comprovante de residência, com conferência pelo Admin e registro da revisão. Incluir nos testes PPD, foto reaproveitada da CNH e comprovante em nome de terceiro. O Admin aceita JPEG e PDF para CNH, CRLV, comprovante de residência e antecedentes.
 - **Revisão.** Vincular cada versão ao alvo e tipo corretos. A conferência administrativa usa as versões atuais. Preservar o bloqueio de aprovação incompleta, a rejeição de revisão substituída e o registro da justificativa, data e identidade administrativa.
 - **Correção.** Nova evidência após decisão reabre o cadastro afetado conforme a Etapa 4. Em envio simultâneo a uma decisão, preservar a serialização atual. A consulta Driver lê a situação resultante. O conteúdo do histórico interno e os dados de outros titulares ficam restritos.
 - **Evolução de dados.** Se a conta exigir estruturas adicionais, propor mudanças aditivas em JDBC com plano de compatibilidade para cadastros existentes. Submeter o esquema a revisão antes de executar alterações.
@@ -65,3 +65,20 @@ A criação do usuário e da conta ocorre em uma transação. O servidor define 
 **Banco e operação.** Aplicar `backend/src/main/resources/driver.sql` após os scripts existentes com a credencial de migração em produção. As tabelas são aditivas. Restringir as permissões de execução aos dados necessários, proteger banco e backups e evitar registrar corpos de requisições e cabeçalhos de autorização. Cadastros legados exigem comprovação de titularidade em fluxo futuro.
 
 **Recuperação pendente de integração.** O futuro emissor deverá confirmar o contato verificado, gerar um segredo aleatório de uso único com prefixo rec_, persistir apenas seu SHA-256 com prazo e entregar pelo canal aprovado. A confirmação e a revogação estão implementadas. Ainda dependem de decisão o método de verificação, o provedor, o prazo do token e o atendimento a quem perdeu o contato. Os testes provisionam credenciais exclusivamente no banco descartável.
+
+## Etapa 5.3 — Veículos e documentos
+
+Todas as rotas abaixo exigem Bearer Driver. O servidor deriva o motorista da sessão. Veículo inexistente ou de outro titular retorna 404.
+
+| Método e rota em /api/driver | Contrato |
+|---|---|
+| POST /veiculos | JSON com placa. Retorna 201 com id e situacao. Placa duplicada retorna 409. |
+| GET /veiculos | Lista os veículos do titular. |
+| GET /veiculos/{id} | Retorna id, placa, situacao, dados técnicos e revisaoCrlv. Dados e revisão podem ser nulos. |
+| PUT /veiculos/{id}/dados | Portas, ar-condicionado, ano de fabricação e município nos campos portas, arCondicionado, anoFabricacao e municipio. Retorna 204. |
+| PUT /veiculos/{id}/crlv | Multipart com arquivo JPEG/PDF e validade opcional. |
+| PUT /me/documentos/{tipo} | Multipart com arquivo. CNH requer ear e validade. ANTECEDENTES e RESIDENCIA aceitam JPEG/PDF, assim como CNH. FOTO_PERFIL e TOXICOLOGICO aceitam JPEG. O toxicológico é facultativo. |
+
+Os envios retornam a revisão (id, tipo, validade e ear). A fila e as decisões continuam no Admin. Substituir uma evidência depois de decisão reabre apenas o cadastro afetado e registra o responsável como driver:<UUID>. A conversão ocorre fora da transação e a gravação revalida titularidade e estado sob bloqueio.
+
+**Pendências antes da exposição pública.** O backend recebe o JPEG da foto e não atesta captura pela câmera. O aplicativo deverá realizar essa captura. Seguem pendentes verificação dos contatos, validação de autenticidade com emissor, política de retenção e reavaliação de aprovações antigas. Revisar cotas de upload, concorrência e isolamento do conversor no ambiente de produção. A sanitização descarta assinaturas digitais e os testes fictícios não substituem os ensaios de legibilidade e latência com documentos reais autorizados.
