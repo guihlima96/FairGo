@@ -186,7 +186,7 @@ class Driver(unittest.TestCase):
         titular = self.criar(a)
         def tentativa(identificador):
             return self.login_local("127.0.0.2", identificador, "incorreta")
-        for identificador in (a["email"], cadastro()["email"]):
+        for identificador in (a["email"], cadastro()["email"], "uuid-malformado"):
             with concurrent.futures.ThreadPoolExecutor(6) as executor:
                 respostas = list(executor.map(tentativa, [identificador] * 6))
             self.assertEqual(sorted(status for status, _ in respostas), [401,401,429,429,429,429])

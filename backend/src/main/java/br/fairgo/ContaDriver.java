@@ -78,7 +78,7 @@ class ContaDriver {
     @PostMapping("/sessoes")
     public Sessao entrar(@Valid @RequestBody Login dados, HttpServletRequest req) {
         String origem = req.getRemoteAddr();
-        tentativas.limitarOrigem("login-ip:" + origem, 40);
+        tentativas.limitarOrigemLogin(origem);
         String login = dados.identificador().strip().toLowerCase(Locale.ROOT);
         String coluna = login.contains("@") ? "u.email" : "u.id";
         Object valor = login;
