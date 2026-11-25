@@ -39,30 +39,22 @@ class ContaDriver {
     private final PasswordEncoder senhas;
     private final String hashFicticio;
     private final RecuperacaoDriver recuperacao;
+    private final TentativasDriver tentativas;
 
-    ContaDriver(JdbcTemplate db, TransactionTemplate tx, PasswordEncoder senhas, RecuperacaoDriver recuperacao) {
+    ContaDriver(JdbcTemplate db, TransactionTemplate tx, PasswordEncoder senhas, RecuperacaoDriver recuperacao,
+                TentativasDriver tentativas) {
         this.db = db;
         this.tx = tx;
         this.senhas = senhas;
         this.hashFicticio = senhas.encode(UUID.randomUUID().toString());
         this.recuperacao = recuperacao;
-    }
-
-    // O contador é confirmado antes da validação da senha, inclusive em caso de erro.
-    private void limitar(String chave, int maximo) {
-        db.update("DELETE FROM limites_driver WHERE ate <= now()");
-        var total = db.queryForList("""
-                INSERT INTO limites_driver(chave,contador,ate) VALUES (?,1,now()+interval '15 minutes')
-                ON CONFLICT (chave) DO UPDATE SET contador=limites_driver.contador+1
-                WHERE limites_driver.contador < ? RETURNING contador
-                """, Integer.class, TokenOpaco.hash(chave), maximo);
-        if (total.isEmpty()) throw new ResponseStatusException(TOO_MANY_REQUESTS);
+        this.tentativas = tentativas;
     }
 
     @PostMapping("/contas")
     @ResponseStatus(CREATED)
     public ResultadoCadastro cadastrar(@Valid @RequestBody Cadastro dados, HttpServletRequest req) {
-        limitar("cadastro:" + req.getRemoteAddr(), 20);
+        tentativas.limitarOrigem("cadastro:" + req.getRemoteAddr(), 20);
         String cpf = dados.cpf().replace(".", "").replace("-", "");
         if (!cpf.matches("[0-9]{11}")) throw new ResponseStatusException(BAD_REQUEST);
         String celular = dados.celular().replaceAll("[^0-9]", "");
@@ -85,20 +77,20 @@ class ContaDriver {
 
     @PostMapping("/sessoes")
     public Sessao entrar(@Valid @RequestBody Login dados, HttpServletRequest req) {
-        limitar("login-ip:" + req.getRemoteAddr(), 40);
+        String origem = req.getRemoteAddr();
+        tentativas.limitarOrigemLogin(origem);
         String login = dados.identificador().strip().toLowerCase(Locale.ROOT);
         String coluna = login.contains("@") ? "u.email" : "u.id";
         Object valor = login;
         if (coluna.equals("u.id")) {
             try { valor = UUID.fromString(login); }
-            catch (IllegalArgumentException ex) { throw new ResponseStatusException(UNAUTHORIZED); }
+            catch (IllegalArgumentException ex) { valor = null; }
         }
         var contas = db.query("SELECT u.id,c.senha_hash FROM usuarios u JOIN contas_driver c ON c.usuario_id=u.id "
                 + "WHERE u.perfil='MOTORISTA' AND " + coluna + "=?",
                 (rs,n) -> new Credencial(rs.getObject(1,UUID.class), rs.getString(2)), valor);
         Credencial conta = contas.isEmpty() ? null : contas.get(0);
-        String chave = "login-conta:" + (conta == null ? login : conta.id());
-        limitar(chave, 8);
+        var reserva = tentativas.reservarLogin(origem, conta == null ? login : conta.id().toString());
         if (!senhas.matches(dados.senha(), conta == null ? hashFicticio : conta.hash()) || conta == null)
             throw new ResponseStatusException(UNAUTHORIZED);
         return tx.execute(status -> {
@@ -106,7 +98,7 @@ class ContaDriver {
             String atual = db.queryForObject("SELECT senha_hash FROM contas_driver WHERE usuario_id=? FOR UPDATE",
                     String.class, conta.id());
             if (!conta.hash().equals(atual)) throw new ResponseStatusException(UNAUTHORIZED);
-            db.update("DELETE FROM limites_driver WHERE chave=?", TokenOpaco.hash(chave));
+            tentativas.sucesso(reserva);
             db.update("DELETE FROM sessoes_driver WHERE usuario_id=? AND expira_em<=now()", conta.id());
             String token = TokenOpaco.gerar("drv_");
             Instant fim = db.queryForObject("""
@@ -139,14 +131,14 @@ class ContaDriver {
     @PostMapping("/recuperacao")
     @ResponseStatus(ACCEPTED)
     public void solicitar(@Valid @RequestBody Pedido pedido, HttpServletRequest req) {
-        limitar("recuperacao-ip:" + req.getRemoteAddr(), 15);
+        tentativas.limitarOrigem("recuperacao-ip:" + req.getRemoteAddr(), 15);
         // A emissão depende do canal verificado e do provedor de entrega.
     }
 
     @PostMapping("/recuperacao/confirmacao")
     @ResponseStatus(NO_CONTENT)
     public void redefinir(@Valid @RequestBody Redefinicao dados, HttpServletRequest req) {
-        limitar("redefinir-ip:" + req.getRemoteAddr(), 15);
+        tentativas.limitarOrigem("redefinir-ip:" + req.getRemoteAddr(), 15);
         if (!recuperacao.redefinir(dados.token(), dados.novaSenha())) throw new ResponseStatusException(BAD_REQUEST);
     }
 
