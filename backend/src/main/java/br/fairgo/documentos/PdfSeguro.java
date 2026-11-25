@@ -1,4 +1,4 @@
-package br.fairgo;
+package br.fairgo.documentos;
 
 import java.io.*;
 import java.nio.file.*;
@@ -11,11 +11,13 @@ import org.apache.pdfbox.pdmodel.graphics.image.JPEGFactory;
 import org.apache.pdfbox.rendering.*;
 
 public final class PdfSeguro {
-    private static final int LIMITE = 4 * 1024 * 1024;
+    private static final int LIMITE = FormatoDocumento.LIMITE_BYTES;
+    public static final class Ocupado extends IOException {}
+    public static final class SaidaExcedida extends IOException {}
     private static final Semaphore VAGAS = new Semaphore(2);
-    static byte[] converter(byte[] dados) throws IOException {
-        if (!VAGAS.tryAcquire()) throw new org.springframework.web.server.ResponseStatusException(
-                org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE, "Tente novamente");
+    public static byte[] converter(byte[] dados) throws IOException {
+        FormatoDocumento.conferirEntrada(dados);
+        if (!VAGAS.tryAcquire()) throw new Ocupado();
         try {
             return executar(dados);
         } finally {
@@ -47,12 +49,11 @@ public final class PdfSeguro {
                 }
             });
             if (!processo.waitFor(15, TimeUnit.SECONDS)) throw new IOException("Tempo de conversão excedido");
-            if (processo.exitValue() == 2) throw new org.springframework.web.server.ResponseStatusException(
-                    org.springframework.http.HttpStatus.PAYLOAD_TOO_LARGE, "Cópia visual acima de 4 MiB");
+            if (processo.exitValue() == 2) throw new SaidaExcedida();
             if (processo.exitValue() != 0) throw new IOException("PDF inválido");
             envio.get();
             byte[] copia = leitura.get();
-            if (copia.length > LIMITE || !Cofre.pdf(copia)) throw new IOException("Saída inválida");
+            if (copia.length > LIMITE || !FormatoDocumento.ehPdf(copia)) throw new IOException("Saída inválida");
             return copia;
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();

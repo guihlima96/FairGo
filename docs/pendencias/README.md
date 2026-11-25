@@ -17,7 +17,7 @@ Registro consolidado em 24/11/2026 a partir das descrições e discussões das P
 | [#6](https://github.com/guihlima96/FairGo/pull/6), [#7](https://github.com/guihlima96/FairGo/pull/7) e [#8](https://github.com/guihlima96/FairGo/pull/8) | Integradas. Planejamento do Driver, conferência manual com PDF, autocadastro, login e parte da recuperação entregues. |
 | [#9](https://github.com/guihlima96/FairGo/pull/9) | Integrada à main. Veículos e documentos do Driver seguem para análise na fila do Admin. Os itens de exposição pública seguem acompanhados neste registro. |
 | #10 e #11 | Integradas. Registro de pendências e consulta de pré-elegibilidade entregues. Comunicação específica de rejeições, verificação real e escolha futura do veículo continuam em DA-02, DA-04 e PA-08. |
-| #12 e #13 | Integradas. Diagnóstico arquitetural e primeira extração de componentes de cadastro. O isolamento documental ARQ-802 segue em planejamento. |
+| #12 e #13 | Integradas. Diagnóstico arquitetural e primeira extração de componentes de cadastro. A ARQ-802 extraiu processamento e cifra para o núcleo documental no mesmo backend. As pendências operacionais seguem em OS-01 a OS-05. |
 | [#14](https://github.com/guihlima96/FairGo/pull/14) | Integrada. Desafios de contato preparados. Provedores, entrega real e ativação da política de aprovação seguem em DA-02. |
 
 As revisões anteriores já trataram a conversão de PDF antes da transação, os arquivos temporários do conversor, as revisões auditadas, o formato de `/me` e a repetição da suíte Driver. Os itens dos registros temáticos são trabalhos futuros ou decisões em aberto.
