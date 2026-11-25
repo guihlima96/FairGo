@@ -1,6 +1,8 @@
 package br.fairgo;
 
 import java.io.IOException;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.crypto.password.Pbkdf2PasswordEncoder;
 import java.util.*;
 import jakarta.servlet.*;
 import jakarta.servlet.http.*;
@@ -20,6 +22,12 @@ import org.springframework.web.filter.OncePerRequestFilter;
 @Configuration
 class SegurancaDriver {
     @Bean
+    PasswordEncoder senhasDriver() {
+        return new Pbkdf2PasswordEncoder("", 16, 600000,
+                Pbkdf2PasswordEncoder.SecretKeyFactoryAlgorithm.PBKDF2WithHmacSHA256);
+    }
+
+    @Bean
     @Order(1)
     SecurityFilterChain driver(HttpSecurity http, JdbcTemplate db) throws Exception {
         var bearer = new OncePerRequestFilter() {
@@ -31,7 +39,7 @@ class SegurancaDriver {
                     var ids = db.queryForList("""
                             SELECT usuario_id FROM sessoes_driver
                             WHERE digest=? AND expira_em > now()
-                            """, UUID.class, Seguranca.hash(auth.substring(7)));
+                            """, UUID.class, TokenOpaco.hash(auth.substring(7)));
                     if (!ids.isEmpty()) {
                         SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(
                                 ids.get(0), null, List.of(new SimpleGrantedAuthority("ROLE_DRIVER"))));

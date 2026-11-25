@@ -1,10 +1,6 @@
 package br.fairgo;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.HexFormat;
 import java.util.List;
 import jakarta.servlet.*;
 import jakarta.servlet.http.*;
@@ -32,7 +28,7 @@ class Seguranca {
                     var ids = db.queryForList("""
                             SELECT admin_id FROM credenciais_admin
                             WHERE digest = ? AND expira_em > CURRENT_TIMESTAMP AND NOT revogada
-                            """, String.class, hash(auth.substring(7)));
+                            """, String.class, TokenOpaco.hash(auth.substring(7)));
                     if (!ids.isEmpty()) {
                         var principal = new UsernamePasswordAuthenticationToken(ids.get(0), null,
                                 List.of(new SimpleGrantedAuthority("ROLE_ADMIN")));
@@ -52,13 +48,4 @@ class Seguranca {
                         .anyRequest().denyAll()).build();
     }
 
-    static String hash(String token) {
-        try {
-            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
-                    .digest(token.getBytes(StandardCharsets.UTF_8)));
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException(e);
-        }
-    }
 }
-

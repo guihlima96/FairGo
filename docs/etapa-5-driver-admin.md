@@ -64,7 +64,7 @@ A criação do usuário e da conta ocorre em uma transação. O servidor define 
 
 **Banco e operação.** Aplicar `backend/src/main/resources/driver.sql` após os scripts existentes com a credencial de migração em produção. As tabelas são aditivas. Restringir as permissões de execução aos dados necessários, proteger banco e backups e evitar registrar corpos de requisições e cabeçalhos de autorização. Cadastros legados exigem comprovação de titularidade em fluxo futuro.
 
-**Recuperação pendente de integração.** O futuro emissor deverá confirmar o contato verificado, gerar um segredo aleatório de uso único com prefixo rec_, persistir apenas seu SHA-256 com prazo e entregar pelo canal aprovado. A confirmação e a revogação estão implementadas. Ainda dependem de decisão o método de verificação, o provedor, o prazo do token e o atendimento a quem perdeu o contato. Os testes provisionam credenciais exclusivamente no banco descartável.
+**Recuperação pendente de integração.** O emissor interno confirma o contato verificado e gera um segredo aleatório de uso único com prefixo rec_, persistindo apenas resumos e validade. A entrega pelo canal aprovado continua pendente. A confirmação e a revogação estão implementadas. Ainda dependem de decisão o método de verificação, o provedor, o prazo do token e o atendimento a quem perdeu o contato. Os testes provisionam credenciais exclusivamente no banco descartável.
 
 ## Etapa 5.3 — Veículos e documentos
 
@@ -146,3 +146,15 @@ O servidor registra o responsável da sessão administrativa e o instante do Pos
 Em GET /api/driver/me e GET /api/driver/me/situacao, nomeVerificado depende exclusivamente do último evento CONFERE correspondente ao nome e às duas revisões atuais. A consulta consolidada também expõe motorista.identidadeDocumentalVerificada com o mesmo valor, pois a conferência é conjunta. O indicador antigo isolado de contas_driver e decisões históricas não constituem evidência. A troca de CNH ou foto e qualquer mudança efetiva do nome invalidam a conferência. Retornar ao nome anterior requer nova conferência. E-mail, celular, situação administrativa e autorização para corridas conservam suas regras.
 
 A conferência registra comparação visual humana. Autenticidade junto ao emissor, biometria, retenção do nome histórico, política para divergências e eventual obrigatoriedade na aprovação precisam de decisão própria.
+
+## Recuperação interna de acesso — DA-03
+
+A solicitação pública da PR #8 mantém o limite por origem, retorna 202 sem corpo para qualquer e-mail válido dentro da cota e não consulta contas nem emite credencial. O endpoint de confirmação mantém os códigos HTTP 204 e 400. As respostas e os logs normais da aplicação omitem o token e a senha.
+
+O emissor é interno, recebe o titular e uma duração positiva de pelo menos um segundo. A duração utilizada em testes é fictícia. A conta e o e-mail verificado são lidos e bloqueados no banco. Sem conta elegível, não há emissão. Um token `rec_` contém 32 bytes aleatórios. Armazenam-se a conta, o SHA-256 do token, a validade e um segundo resumo que vincula o segredo ao UUID e ao e-mail. A tabela conserva uma credencial corrente por titular. Emissões concorrentes são serializadas e apenas a última credencial pode ser consumida. A troca do e-mail invalida sua verificação e a revogação da verificação remove o token. Confirmar um token válido consome a credencial, atualiza o hash da senha e encerra todas as sessões da conta na mesma transação. Credenciais sem vínculo, vencidas, substituídas ou consumidas são recusadas.
+
+### Abuso e bloqueio provocado por terceiros
+
+O login admite hoje oito tentativas por conta a cada quinze minutos. Ao esgotá-las, um terceiro pode impedir temporariamente até um login legítimo. A recuperação pública tem contadores separados para solicitação e confirmação por endereço de origem. O limite pode atingir usuários sob o mesmo IP. A resposta 429 depende da origem mesmo quando o e-mail não existe. Solicitar recuperação nesta etapa não consome tentativas de login, encerra sessões ou substitui um token.
+
+**Propostas para decisão antes de ativar entrega.** Avaliar atraso progressivo por conta e origem combinado com limite global, e um caminho de revalidação por contato já comprovado para o titular bloqueado. Evitar que pedidos anônimos substituam continuamente uma credencial válida. Avaliar intervalo mínimo e deduplicação por conta e destino com resposta uniforme. Medir falsos bloqueios em redes compartilhadas, validar a origem atrás do proxy e definir atendimento para perda do contato. Decidir prazo, expurgo, política de substituição e tratamento de entrega ambígua. Os limites atuais do login continuam vigentes.

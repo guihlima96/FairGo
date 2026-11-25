@@ -1,7 +1,6 @@
 package br.fairgo;
 
 import java.security.Principal;
-import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.*;
 import jakarta.servlet.http.HttpServletRequest;
@@ -10,7 +9,9 @@ import jakarta.validation.constraints.*;
 import org.hibernate.validator.constraints.br.CPF;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.security.crypto.password.Pbkdf2PasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
@@ -25,7 +26,9 @@ class ContaDriver {
     record Login(@NotBlank @Size(max=254) String identificador, @NotBlank @Size(max=128) String senha) {}
     record Pedido(@NotBlank @Email @Size(max=254) String email) {}
     record Redefinicao(@NotNull @Pattern(regexp="rec_[0-9a-f]{64}") String token,
-                       @NotBlank @Size(min=15,max=128) String novaSenha) {}
+                       @NotBlank @Size(min=15,max=128) String novaSenha) {
+        @Override public String toString() { return "Redefinicao[protegida]"; }
+    }
     record Credencial(UUID id, String hash) {}
     record MinhaConta(UUID id, String nome, String email, String situacao, String cpf, String celular,
                       boolean nomeVerificado, boolean emailVerificado, boolean celularVerificado) {}
@@ -33,14 +36,16 @@ class ContaDriver {
 
     private final JdbcTemplate db;
     private final TransactionTemplate tx;
-    private final SecureRandom random = new SecureRandom();
-    private final Pbkdf2PasswordEncoder senhas = new Pbkdf2PasswordEncoder("", 16, 600000,
-            Pbkdf2PasswordEncoder.SecretKeyFactoryAlgorithm.PBKDF2WithHmacSHA256);
-    private final String hashFicticio = senhas.encode(UUID.randomUUID().toString());
+    private final PasswordEncoder senhas;
+    private final String hashFicticio;
+    private final RecuperacaoDriver recuperacao;
 
-    ContaDriver(JdbcTemplate db, TransactionTemplate tx) {
+    ContaDriver(JdbcTemplate db, TransactionTemplate tx, PasswordEncoder senhas, RecuperacaoDriver recuperacao) {
         this.db = db;
         this.tx = tx;
+        this.senhas = senhas;
+        this.hashFicticio = senhas.encode(UUID.randomUUID().toString());
+        this.recuperacao = recuperacao;
     }
 
     // O contador é confirmado antes da validação da senha, inclusive em caso de erro.
@@ -50,7 +55,7 @@ class ContaDriver {
                 INSERT INTO limites_driver(chave,contador,ate) VALUES (?,1,now()+interval '15 minutes')
                 ON CONFLICT (chave) DO UPDATE SET contador=limites_driver.contador+1
                 WHERE limites_driver.contador < ? RETURNING contador
-                """, Integer.class, Seguranca.hash(chave), maximo);
+                """, Integer.class, TokenOpaco.hash(chave), maximo);
         if (total.isEmpty()) throw new ResponseStatusException(TOO_MANY_REQUESTS);
     }
 
@@ -101,15 +106,13 @@ class ContaDriver {
             String atual = db.queryForObject("SELECT senha_hash FROM contas_driver WHERE usuario_id=? FOR UPDATE",
                     String.class, conta.id());
             if (!conta.hash().equals(atual)) throw new ResponseStatusException(UNAUTHORIZED);
-            db.update("DELETE FROM limites_driver WHERE chave=?", Seguranca.hash(chave));
+            db.update("DELETE FROM limites_driver WHERE chave=?", TokenOpaco.hash(chave));
             db.update("DELETE FROM sessoes_driver WHERE usuario_id=? AND expira_em<=now()", conta.id());
-            byte[] bytes = new byte[32];
-            random.nextBytes(bytes);
-            String token = "drv_" + HexFormat.of().formatHex(bytes);
+            String token = TokenOpaco.gerar("drv_");
             Instant fim = db.queryForObject("""
                     INSERT INTO sessoes_driver(digest,usuario_id,expira_em) VALUES (?,?,now()+interval '8 hours')
                     RETURNING expira_em
-                    """, java.sql.Timestamp.class, Seguranca.hash(token), conta.id()).toInstant();
+                    """, java.sql.Timestamp.class, TokenOpaco.hash(token), conta.id()).toInstant();
             return new Sessao(token, fim);
         });
     }
@@ -130,7 +133,7 @@ class ContaDriver {
     @ResponseStatus(NO_CONTENT)
     public void sair(@RequestHeader("Authorization") String bearer, Principal titular) {
         db.update("DELETE FROM sessoes_driver WHERE usuario_id=? AND digest=?",
-                UUID.fromString(titular.getName()), Seguranca.hash(bearer.substring(7)));
+                UUID.fromString(titular.getName()), TokenOpaco.hash(bearer.substring(7)));
     }
 
     @PostMapping("/recuperacao")
@@ -144,17 +147,11 @@ class ContaDriver {
     @ResponseStatus(NO_CONTENT)
     public void redefinir(@Valid @RequestBody Redefinicao dados, HttpServletRequest req) {
         limitar("redefinir-ip:" + req.getRemoteAddr(), 15);
-        String digest = Seguranca.hash(dados.token());
-        tx.executeWithoutResult(status -> {
-            var ids = db.queryForList("""
-                    SELECT c.usuario_id FROM contas_driver c JOIN recuperacoes_driver r USING(usuario_id)
-                    WHERE r.digest=? AND r.expira_em>now() AND c.email_verificado FOR UPDATE OF c
-                    """, UUID.class, digest);
-            if (ids.isEmpty() || db.update("""
-                    DELETE FROM recuperacoes_driver WHERE digest=? AND expira_em>clock_timestamp()
-                    """, digest) != 1) throw new ResponseStatusException(BAD_REQUEST);
-            db.update("UPDATE contas_driver SET senha_hash=? WHERE usuario_id=?", senhas.encode(dados.novaSenha()), ids.get(0));
-            db.update("DELETE FROM sessoes_driver WHERE usuario_id=?", ids.get(0));
-        });
+        if (!recuperacao.redefinir(dados.token(), dados.novaSenha())) throw new ResponseStatusException(BAD_REQUEST);
     }
+
+    // A descrição padrão de erros de binding pode conter valores rejeitados (senha ou token).
+    @ExceptionHandler({MethodArgumentNotValidException.class, HttpMessageNotReadableException.class})
+    @ResponseStatus(BAD_REQUEST)
+    void entradaInvalida() {}
 }

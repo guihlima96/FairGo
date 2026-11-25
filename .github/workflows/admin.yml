@@ -40,7 +40,8 @@ jobs:
         run: |
           export FAIRGO_CONTACT_KEY=$(openssl rand -base64 32)
           export FAIRGO_DOCUMENT_KEY=$(openssl rand -base64 32)
-          java -jar target/backend-*.jar > "$RUNNER_TEMP/backend.log" 2>&1 &
+          export FAIRGO_TEST_BACKEND_LOG="$RUNNER_TEMP/backend.log"
+          java -jar target/backend-*.jar > "$FAIRGO_TEST_BACKEND_LOG" 2>&1 &
           pid=$!
           trap 'kill "$pid" 2>/dev/null || true' EXIT
           for tentativa in {1..60}; do
