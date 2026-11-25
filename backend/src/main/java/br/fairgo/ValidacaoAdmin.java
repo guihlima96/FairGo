@@ -1,5 +1,7 @@
 package br.fairgo;
 
+import br.fairgo.documentos.FormatoDocumento;
+
 import java.security.*;
 import java.time.*;
 import java.util.*;
@@ -83,7 +85,7 @@ class ValidacaoAdmin {
         if (rows.isEmpty()) throw new ResponseStatusException(NOT_FOUND);
         var row = rows.get(0);
         byte[] dados = cofre.abrir((byte[]) row.get("imagem_cifrada"), id, (String) row.get("tipo"), (String) row.get("formato"));
-        boolean pdf = Cofre.pdf(dados);
+        boolean pdf = FormatoDocumento.ehPdf(dados);
         return ResponseEntity.ok().cacheControl(CacheControl.noStore())
                 .contentType(pdf ? MediaType.APPLICATION_PDF : MediaType.IMAGE_JPEG)
                 .header("Content-Disposition", pdf ? "attachment; filename=documento.pdf" : "attachment; filename=documento.jpg")

@@ -21,7 +21,7 @@ O painel e os clientes Driver usam controladores HTTP distintos. Spring Security
 | Criar pessoa e conta | `CadastroAdmin`, `ContaDriver` | Ambos gravam em `usuarios`. O autocadastro cria também a conta Driver na mesma transação. O cadastro administrativo legado tem fluxo próprio. |
 | Autenticar e autorizar | `Seguranca`, `SegurancaDriver`, `ContaDriver` | Admin e Driver usam papéis, tokens e consultas distintos. O Driver usa o cálculo de digest definido em `Seguranca`. |
 | Cadastrar veículo e receber evidências | `CadastroAdmin`, `CadastroVeiculoDriver`, `ValidacaoAdmin`, `CadastroCompartilhado` | As duas frentes usam o mesmo serviço de escrita para veículo, dados técnicos e documentos. O serviço usa o cofre e mantém a reabertura e o histórico. |
-| Preparar e proteger documentos | `Cofre`, `PdfSeguro` | O cofre valida o formato, encaminha PDFs para conversão e cifra o conteúdo com contexto de titular e tipo. A política de formatos ainda menciona tipos documentais do FairGo. |
+| Preparar e proteger documentos | `Cofre`, `PdfSeguro` | O adaptador Cofre aplica a política FAIRGO e delega o processamento e a cifra ao pacote documentos. |
 | Decidir e consultar | `ValidacaoAdmin`, `SituacaoDriver` | A decisão administrativa verifica as revisões atuais. A consulta Driver usa uma transação de leitura consistente e apresenta a situação do titular e de seus veículos. |
 
 Na substituição documental, a aplicação verifica o titular, prepara o arquivo e só então bloqueia o cadastro para reconferir a titularidade e gravar a revisão. Quando aplicável, a mesma transação reabre o cadastro e registra o evento. O histórico referencia as revisões conferidas. A consulta de pré-elegibilidade considera motorista e veículo próprio aprovados e devolve `autorizadoParaCorridas=false`. Esses comportamentos são referências de compatibilidade em futuras extrações. [Código do backend](../backend/src/main/java/br/fairgo/)
@@ -70,3 +70,19 @@ Enquanto a integração estiver pendente, a solicitação de verificação segue
 ### Controle de tentativas
 
 `ControleTentativas` implementa reservas de janela fixa, limpeza limitada e devolução associada ao vencimento original em PostgreSQL. Não conhece perfis, sessões ou transporte HTTP. `TentativasDriver` compõe as cotas por operação, conta, origem e sistema para a API Driver. O controlador identifica a conexão e o titular e confirma a devolução das reservas pessoais na transação de abertura da sessão. A derivação da senha ocorre fora da transação de admissão. O orçamento global é compartilhado pelas instâncias e sua linha pode sofrer contenção; medir em carga antes da exposição pública.
+
+### ARQ-802 — processamento e proteção documental
+
+Antes da extração, Cofre recebia MultipartFile, interpretava tipos de mobilidade, recodificava JPEG e executava AES-GCM. PdfSeguro dependia do cofre para reconhecer a saída e lançava exceções HTTP. Agora o pacote `br.fairgo.documentos` opera sobre bytes. Admin e Driver continuam usando o mesmo serviço de gravação.
+
+| Componente | Entrada e saída | Dependências, limites e erros |
+|---|---|---|
+| FormatoDocumento | Bytes → indicação de assinatura PDF | JDK. O prefixo identifica um candidato, cuja validade é conferida pelo conversor. As demais entradas passam pelo decodificador JPEG. |
+| JpegSeguro | Bytes JPEG → nova imagem JPEG | ImageIO em memória. Entrada de até 4 MiB e até 8 milhões de pixels. Formato inválido ou excesso gera IOException. |
+| PdfSeguro | Bytes PDF → PDF reconstruído com imagens | JDK e PDFBox. Processo separado via stdin/stdout. Até duas conversões por JVM, 15 s, heap de 160 MiB e memória direta de 16 MiB. Entrada e saída de até 4 MiB, 1–10 páginas, lado da caixa de até 14.400 pontos e renderização limitada a 1.800 pixels no maior lado. PDF cifrado ou inválido gera IOException. Ocupado e SaidaExcedida distinguem saturação e cópia visual grande. Em classes soltas executa o main diretamente e no JAR Spring Boot usa PropertiesLauncher. |
+| CifraDocumental | Bytes e contexto autenticado → bytes cifrados, ou operação inversa | JCA, chave de 32 bytes, AES-GCM com nonce aleatório de 12 bytes no início do registro e tag de 128 bits. Falha de autenticação gera GeneralSecurityException. O chamador fornece o contexto exato nas duas operações. |
+| Cofre (adaptador FAIRGO) | Upload, titular e tipo → formato e conteúdo protegido | Aplica a lista de tipos permitidos para PDF e converte os erros de documento, saída excessiva e saturação em HTTP 400, 413 e 503. Mantém AAD ASCII titular:tipo:formato e, para registros com formato nulo, titular:tipo. A leitura legada remove o marcador 1 quando presente, solicita reenvio do PDF bruto de desenvolvimento (422) e mantém os demais bytes. |
+
+O teste de certificado de curso usa o núcleo sem cadastro, Spring ou banco. A regressão de compatibilidade lê um JPEG sintético produzido pelo Cofre do commit de01322 com uma chave exclusiva de teste. Gravação, titularidade, revisões e reabertura continuam no fluxo transacional descrito acima.
+
+O processo do conversor herda as permissões do usuário do backend. Cotas por conta, isolamento no ambiente de destino, legibilidade, retenção, rotação de chave e restauração continuam no [registro operacional](pendencias/operacao-seguranca.md). A autenticidade do documento e o tratamento de assinaturas digitais seguem em [DA-05](pendencias/driver-admin.md).
