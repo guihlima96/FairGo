@@ -16,11 +16,17 @@ class SituacaoDriver {
     record Evidencia(Tipo tipo, boolean obrigatorio, UUID revisaoAtual, LocalDate validade, Boolean ear) {}
     enum Estado { PENDENTE, APROVADO, REJEITADO }
 
-    record Analise(Estado situacao, String orientacaoPublica) {
-        static Analise de(String situacao) {
-            Estado estado = Estado.valueOf(situacao);
-            return new Analise(estado, estado == Estado.REJEITADO
-                    ? "Revise os dados e documentos deste cadastro." : null);
+    record Analise(Estado situacao, String orientacaoPublica,
+                   @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+                   String codigoPublico,
+                   @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+                   String documentoAfetado) {
+        static Analise de(java.sql.ResultSet rs) throws java.sql.SQLException {
+            Estado estado = Estado.valueOf(rs.getString("situacao"));
+            if (estado != Estado.REJEITADO) return new Analise(estado, null, null, null);
+            String codigo = rs.getString("codigo_publico");
+            String mensagem = codigo == null ? MotivoPublico.OUTROS.mensagem : MotivoPublico.valueOf(codigo).mensagem;
+            return new Analise(estado, mensagem, codigo, rs.getString("documento_publico"));
         }
     }
     record Motorista(UUID id, Analise analise, boolean nomeVerificado, boolean emailVerificado,
@@ -50,21 +56,23 @@ class SituacaoDriver {
         UUID titular = UUID.fromString(sessao.getName());
         var documentos = documentosPessoais(titular);
         var motorista = db.queryForObject("""
-                SELECT u.situacao, i.verificada AS nome_verificado, c.email_verificado, c.celular_verificado
+                SELECT u.situacao, r.codigo_publico, r.documento_publico, i.verificada AS nome_verificado, c.email_verificado, c.celular_verificado
                 FROM usuarios u JOIN contas_driver c ON c.usuario_id=u.id
                 JOIN identidade_motorista_atual i ON i.id=u.id
+                LEFT JOIN orientacao_rejeicao_atual r ON r.motorista_id=u.id
                 WHERE u.id=? AND u.perfil='MOTORISTA'
-                """, (rs, n) -> new Motorista(titular, Analise.de(rs.getString("situacao")),
+                """, (rs, n) -> new Motorista(titular, Analise.de(rs),
                         rs.getBoolean("nome_verificado"), rs.getBoolean("email_verificado"),
                         rs.getBoolean("celular_verificado"), documentos), titular);
         var veiculos = db.query("""
-                SELECT v.id, v.placa, v.situacao, d.veiculo_id IS NOT NULL AS informado,
+                SELECT r.codigo_publico, r.documento_publico, v.id, v.placa, v.situacao, d.veiculo_id IS NOT NULL AS informado,
                        c.id AS revisao, c.validade
                 FROM veiculos v LEFT JOIN dados_veiculo d ON d.veiculo_id=v.id
                 LEFT JOIN documentos_cadastro c ON c.veiculo_id=v.id AND c.tipo='CRLV'
+                LEFT JOIN orientacao_rejeicao_atual r ON r.veiculo_id=v.id
                 WHERE v.motorista_id=? ORDER BY v.placa, v.id
                 """, (rs, n) -> new Veiculo(rs.getObject("id", UUID.class), rs.getString("placa"),
-                        Analise.de(rs.getString("situacao")), rs.getBoolean("informado"),
+                        Analise.de(rs), rs.getBoolean("informado"),
                         new Evidencia(Tipo.CRLV, true, rs.getObject("revisao", UUID.class),
                                 rs.getObject("validade", LocalDate.class), null)), titular);
         return new Resposta(motorista, veiculos, PreElegibilidade.cadastral(motorista, veiculos));

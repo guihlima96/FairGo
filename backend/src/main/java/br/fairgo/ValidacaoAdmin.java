@@ -21,7 +21,15 @@ import static org.springframework.http.HttpStatus.*;
 class ValidacaoAdmin {
     enum Resultado { APROVADO, REJEITADO }
     record Decisao(@NotNull Resultado situacao, @NotBlank @Size(max=500) String motivo,
-                   Boolean identidadeConferida, @Size(max=5) Set<UUID> documentosConferidos) {}
+                   Boolean identidadeConferida, @Size(max=5) Set<UUID> documentosConferidos,
+                   @Valid MotivoPublico.Selecao orientacao) {}
+    record Opcao(String codigo, String mensagem, List<Tipo> documentos) {}
+
+    @GetMapping("/motivos-publicos/{alvo}")
+    public List<Opcao> motivos(@PathVariable Alvo alvo) {
+        return Arrays.stream(MotivoPublico.values()).filter(m -> m.aceita(alvo))
+                .map(m -> new Opcao(m.name(), m.mensagem, m.documentos(alvo))).toList();
+    }
     private final JdbcTemplate db;
     private final Cofre cofre;
     private final CadastroCompartilhado cadastros;
@@ -48,18 +56,20 @@ class ValidacaoAdmin {
     }
 
     record ItemFila(UUID id, Alvo tipo, String descricao, String situacao, boolean prontoParaAnalise,
-                    Set<Tipo> enviados, Set<Tipo> ausentes, Boolean dadosTecnicosPresentes) {}
+                    Set<Tipo> enviados, Set<Tipo> ausentes, Boolean dadosTecnicosPresentes, String codigoPublico) {}
 
     @GetMapping("/fila")
     public List<ItemFila> fila() {
         return db.query("""
                 SELECT u.id, 'MOTORISTA' AS alvo, u.nome AS descricao, u.situacao, NULL::boolean AS tecnicos,
-                       ARRAY(SELECT d.tipo FROM documentos_cadastro d WHERE d.motorista_id=u.id) AS tipos
-                FROM usuarios u WHERE u.perfil='MOTORISTA'
+                       ARRAY(SELECT d.tipo FROM documentos_cadastro d WHERE d.motorista_id=u.id) AS tipos, r.codigo_publico
+                FROM usuarios u LEFT JOIN orientacao_rejeicao_atual r ON r.motorista_id=u.id
+                WHERE u.perfil='MOTORISTA'
                 UNION ALL
                 SELECT v.id, 'VEICULO', v.placa, v.situacao, t.veiculo_id IS NOT NULL,
-                       ARRAY(SELECT d.tipo FROM documentos_cadastro d WHERE d.veiculo_id=v.id)
+                       ARRAY(SELECT d.tipo FROM documentos_cadastro d WHERE d.veiculo_id=v.id), r.codigo_publico
                 FROM veiculos v LEFT JOIN dados_veiculo t ON t.veiculo_id=v.id
+                LEFT JOIN orientacao_rejeicao_atual r ON r.veiculo_id=v.id
                 ORDER BY alvo, descricao, id
                 """, (r,n) -> {
             Alvo alvo = Alvo.valueOf(r.getString("alvo"));
@@ -72,7 +82,7 @@ class ValidacaoAdmin {
             Boolean tecnicos = r.getObject("tecnicos", Boolean.class);
             return new ItemFila(r.getObject("id", UUID.class), alvo, r.getString("descricao"),
                     r.getString("situacao"), ausentes.isEmpty() && !Boolean.FALSE.equals(tecnicos),
-                    enviados, ausentes, tecnicos);
+                    enviados, ausentes, tecnicos, r.getString("codigo_publico"));
         });
     }
 
@@ -127,6 +137,11 @@ class ValidacaoAdmin {
     public void decidir(@PathVariable Alvo alvo, @PathVariable UUID id, @Valid @RequestBody Decisao decisao,
                         Principal admin) {
         if (!cadastros.estado(alvo,id,true).equals("PENDENTE")) throw new ResponseStatusException(CONFLICT);
+        MotivoPublico.Selecao orientacao = decisao.orientacao();
+        if (orientacao != null) {
+            if (decisao.situacao() != Resultado.REJEITADO) throw new ResponseStatusException(BAD_REQUEST);
+            validarOrientacao(alvo, id, orientacao);
+        }
         if (decisao.situacao() == Resultado.APROVADO) {
             var docs = documentos(alvo,id);
             var exigidos = CadastroCompartilhado.obrigatorios(alvo);
@@ -146,7 +161,28 @@ class ValidacaoAdmin {
         }
         cadastros.registrar(alvo,id,decisao.situacao().name(),decisao.motivo().strip(),admin,
                 decisao.situacao() == Resultado.APROVADO
-                        ? decisao.documentosConferidos().toArray(UUID[]::new) : null);
+                        ? decisao.documentosConferidos().toArray(UUID[]::new) : null,
+                orientacao);
+    }
+
+    private void validarOrientacao(Alvo alvo, UUID id, MotivoPublico.Selecao orientacao) {
+        MotivoPublico motivo;
+        try {
+            motivo = MotivoPublico.valueOf(orientacao.codigo());
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(BAD_REQUEST);
+        }
+        if (!motivo.aceita(alvo)) throw new ResponseStatusException(BAD_REQUEST);
+        var tipos = motivo.documentos(alvo);
+        if (tipos.isEmpty()) {
+            if (orientacao.documento() != null || orientacao.revisao() != null)
+                throw new ResponseStatusException(BAD_REQUEST);
+            return;
+        }
+        if (orientacao.revisao() == null || tipos.stream().noneMatch(t -> t.name().equals(orientacao.documento())))
+            throw new ResponseStatusException(BAD_REQUEST);
+        if (documentos(alvo,id).stream().noneMatch(d -> d.id().equals(orientacao.revisao())
+                && d.tipo().name().equals(orientacao.documento()))) throw new ResponseStatusException(CONFLICT);
     }
 
     private boolean veiculoElegivel(UUID id) {
@@ -160,10 +196,10 @@ class ValidacaoAdmin {
     @GetMapping("/{alvo}/{id}/historico")
     public List<Map<String,Object>> historico(@PathVariable Alvo alvo, @PathVariable UUID id) {
         cadastros.estado(alvo,id,false);
-        return db.query("SELECT sequencia,situacao,motivo,responsavel,data,revisoes_conferidas FROM decisoes_cadastro WHERE "
+        return db.query("SELECT sequencia,situacao,motivo,responsavel,data,revisoes_conferidas,codigo_publico,documento_publico,revisao_afetada FROM decisoes_cadastro WHERE "
                 + alvo.coluna + "=? ORDER BY sequencia", (rs, n) -> {
                     var evento = new LinkedHashMap<String,Object>();
-                    for (String campo : List.of("sequencia","situacao","motivo","responsavel","data"))
+                    for (String campo : List.of("sequencia","situacao","motivo","responsavel","data","codigo_publico","documento_publico","revisao_afetada"))
                         evento.put(campo, rs.getObject(campo));
                     var revisoes = rs.getArray("revisoes_conferidas");
                     evento.put("revisoes_conferidas", revisoes == null ? null : revisoes.getArray());

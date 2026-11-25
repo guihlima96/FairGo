@@ -58,3 +58,17 @@ DO 'BEGIN
         ALTER TABLE decisoes_cadastro ADD COLUMN revisoes_conferidas uuid[];
     END IF;
 END';
+
+ALTER TABLE decisoes_cadastro ADD COLUMN IF NOT EXISTS codigo_publico text;
+ALTER TABLE decisoes_cadastro ADD COLUMN IF NOT EXISTS documento_publico text;
+ALTER TABLE decisoes_cadastro ADD COLUMN IF NOT EXISTS revisao_afetada uuid;
+
+CREATE OR REPLACE VIEW orientacao_rejeicao_atual AS
+SELECT motorista_id, veiculo_id, codigo_publico, documento_publico
+FROM (
+    SELECT DISTINCT ON (motorista_id, veiculo_id)
+           motorista_id, veiculo_id, situacao, codigo_publico, documento_publico
+    FROM decisoes_cadastro
+    ORDER BY motorista_id, veiculo_id, sequencia DESC
+) ultima
+WHERE situacao='REJEITADO' AND codigo_publico IS NOT NULL;
