@@ -26,7 +26,7 @@ function limparDetalhe() {
 }
 function limpar() {
     limparDetalhe();
-    el("fila").replaceChildren();
+    limparFila();
     el("busca").reset();
     el("aviso").textContent = "";
 }
@@ -71,15 +71,60 @@ function botao(texto, acao) {
     b.onclick = () => executar(acao);
     return b;
 }
-async function fila() {
-    el("fila").replaceChildren();
-    const linhas = await (await api("pendentes")).json();
-    for (const cadastro of linhas) {
-        const nome = nomes[cadastro.tipo] + " · " + cadastro.descricao;
-        item("fila", "").append(botao(nome, () => consultar(cadastro.tipo, cadastro.id, nome)));
+const grupos = ["incompletos", "prontos", "aprovados", "rejeitados"];
+let linhasFila = null;
+let versaoFila = 0;
+let atualizando = false;
+
+function limparFila() {
+    versaoFila++;
+    linhasFila = null;
+    for (const grupo of grupos) {
+        el(grupo).replaceChildren();
+        document.querySelector('[data-total="' + grupo + '"]').textContent = "";
     }
-    if (!linhas.length) item("fila", "Nenhum cadastro pendente.");
 }
+function mostrarFila() {
+    if (!linhasFila) return;
+    const contagens = Object.fromEntries(grupos.map(g => [g, 0]));
+    for (const grupo of grupos) el(grupo).replaceChildren();
+    for (const cadastro of linhasFila) {
+        if (el("filtro").value && el("filtro").value !== cadastro.tipo) continue;
+        const grupo = cadastro.situacao === "PENDENTE"
+            ? (cadastro.prontoParaAnalise ? "prontos" : "incompletos") : cadastro.situacao.toLowerCase() + "s";
+        contagens[grupo]++;
+        const nome = nomes[cadastro.tipo] + " · " + cadastro.descricao;
+        const linha = item(grupo, "");
+        linha.append(botao(nome, () => consultar(cadastro.tipo, cadastro.id, nome)));
+        const evidencias = document.createElement("small");
+        evidencias.style.display = "block";
+        evidencias.textContent = "Enviados: " + (cadastro.enviados.join(", ") || "nenhum") +
+            ". Ausentes: " + (cadastro.ausentes.join(", ") || "nenhum") + "." +
+            (cadastro.tipo === "VEICULO" ? " Dados técnicos " + (cadastro.dadosTecnicosPresentes ? "presentes." : "ausentes.") : "");
+        linha.append(evidencias);
+    }
+    for (const grupo of grupos) document.querySelector('[data-total="' + grupo + '"]').textContent = contagens[grupo];
+}
+async function fila() {
+    const versao = ++versaoFila;
+    const linhas = await (await api("fila")).json();
+    if (versao !== versaoFila) return;
+    if (JSON.stringify(linhas) === JSON.stringify(linhasFila)) return;
+    linhasFila = linhas;
+    mostrarFila();
+}
+el("filtro").onchange = mostrarFila;
+setInterval(async () => {
+    if (!linhasFila || ocupado || atualizando || document.hidden) return;
+    atualizando = true;
+    try {
+        await fila();
+    } catch (erro) {
+        el("aviso").textContent = erro.message;
+    } finally {
+        atualizando = false;
+    }
+}, 15000);
 async function consultar(tipo, id, nome) {
     limparDetalhe();
     const rota = tipo + "/" + encodeURIComponent(id);

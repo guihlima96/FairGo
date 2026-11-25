@@ -47,6 +47,35 @@ class ValidacaoAdmin {
         return cadastros.enviar(alvo,id,tipo,arquivo,ear,validade,admin,null);
     }
 
+    record ItemFila(UUID id, Alvo tipo, String descricao, String situacao, boolean prontoParaAnalise,
+                    Set<Tipo> enviados, Set<Tipo> ausentes, Boolean dadosTecnicosPresentes) {}
+
+    @GetMapping("/fila")
+    public List<ItemFila> fila() {
+        return db.query("""
+                SELECT u.id, 'MOTORISTA' AS alvo, u.nome AS descricao, u.situacao, NULL::boolean AS tecnicos,
+                       ARRAY(SELECT d.tipo FROM documentos_cadastro d WHERE d.motorista_id=u.id) AS tipos
+                FROM usuarios u WHERE u.perfil='MOTORISTA'
+                UNION ALL
+                SELECT v.id, 'VEICULO', v.placa, v.situacao, t.veiculo_id IS NOT NULL,
+                       ARRAY(SELECT d.tipo FROM documentos_cadastro d WHERE d.veiculo_id=v.id)
+                FROM veiculos v LEFT JOIN dados_veiculo t ON t.veiculo_id=v.id
+                ORDER BY alvo, descricao, id
+                """, (r,n) -> {
+            Alvo alvo = Alvo.valueOf(r.getString("alvo"));
+            var ausentes = CadastroCompartilhado.obrigatorios(alvo);
+            var enviados = EnumSet.noneOf(Tipo.class);
+            for (String nome : (String[]) r.getArray("tipos").getArray()) {
+                Tipo tipo = Tipo.valueOf(nome);
+                if (ausentes.remove(tipo)) enviados.add(tipo);
+            }
+            Boolean tecnicos = r.getObject("tecnicos", Boolean.class);
+            return new ItemFila(r.getObject("id", UUID.class), alvo, r.getString("descricao"),
+                    r.getString("situacao"), ausentes.isEmpty() && !Boolean.FALSE.equals(tecnicos),
+                    enviados, ausentes, tecnicos);
+        });
+    }
+
     @GetMapping("/pendentes")
     public List<Map<String,Object>> pendentes() {
         return db.queryForList("""
