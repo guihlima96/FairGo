@@ -20,11 +20,24 @@ class Painel(unittest.TestCase):
                                            "perfil": "MOTORISTA"}, "POST")["id"]
         placa = "WEB" + str(uuid.uuid4().int % 10000).zfill(4)
         veiculo = call("veiculos", 201, {"placa": placa, "motoristaId": motorista}, "POST")["id"]
+        def entrada(id_cadastro):
+            return next(i for i in call("validacao/fila", 200) if i["id"] == id_cadastro)
+
+        call("validacao/fila", 401, token=None)
+        inicial = entrada(motorista)
+        self.assertFalse(inicial["prontoParaAnalise"])
+        self.assertEqual(set(inicial["ausentes"]), {"CNH", "ANTECEDENTES", "RESIDENCIA", "FOTO_PERFIL"})
+        self.assertEqual(inicial["enviados"], [])
+        self.assertFalse(entrada(veiculo)["dadosTecnicosPresentes"])
         for tipo in ("ANTECEDENTES", "FOTO_PERFIL", "RESIDENCIA", "CNH"):
             upload("validacao/MOTORISTA/" + motorista, tipo,
                    {"ear": "true", "validade": "2099-12-31"} if tipo == "CNH" else {})
         rota = "validacao/VEICULO/" + veiculo
         doc = upload(rota, "CRLV")
+        self.assertFalse(entrada(veiculo)["prontoParaAnalise"])
+        self.assertEqual(entrada(veiculo)["enviados"], ["CRLV"])
+        self.assertTrue(entrada(motorista)["prontoParaAnalise"])
+        self.assertEqual(entrada(motorista)["situacao"], "PENDENTE")
         call(rota + "/dados", 204, {"portas": 4, "arCondicionado": True,
                                     "anoFabricacao": datetime.date.today().year, "municipio": "0000002"}, "PUT")
         call("validacao/pendentes", 401, token=None)
@@ -42,11 +55,33 @@ class Painel(unittest.TestCase):
         navegador.get(URL + "/admin/index.html")
         campo("token").send_keys(TOKEN)
         campo("acesso").find_element(By.TAG_NAME, "button").click()
+        espera.until(lambda _: placa in campo("prontos").text)
+        self.assertTrue(entrada(veiculo)["prontoParaAnalise"])
+        filtro = Select(campo("filtro"))
+        filtro.select_by_value("VEICULO")
+        self.assertNotIn(nome, campo("fila").text)
+        self.assertIn(placa, campo("prontos").text)
+        filtro.select_by_value("")
+        def total(grupo):
+            return int(navegador.find_element(By.CSS_SELECTOR, "[data-total='" + grupo + "']").text)
+
+        # Envio externo muda os indicadores com o painel aberto.
+        extra = "Motorista incompleto " + uuid.uuid4().hex
+        id_extra = call("usuarios", 201, {"nome": extra, "email": uuid.uuid4().hex + "@example.com",
+                                         "perfil": "MOTORISTA"}, "POST")["id"]
+        WebDriverWait(navegador, 35).until(lambda _: extra in campo("incompletos").text)
+        incompletos, prontos = total("incompletos"), total("prontos")
+        for tipo_doc in ("CNH", "ANTECEDENTES", "RESIDENCIA", "FOTO_PERFIL"):
+            upload("validacao/MOTORISTA/" + id_extra, tipo_doc,
+                   {"ear": "true", "validade": "2099-12-31"} if tipo_doc == "CNH" else {})
+        WebDriverWait(navegador, 35).until(lambda _: extra in campo("prontos").text)
+        self.assertEqual(total("incompletos"), incompletos - 1)
+        self.assertEqual(total("prontos"), prontos + 1)
         for descricao, resultado in [(nome, "REJEITADO"), (placa, "APROVADO"), (nome, "APROVADO")]:
             conferir_identidade = descricao == nome and resultado == "APROVADO"
             if conferir_identidade:
                 upload("validacao/MOTORISTA/" + motorista, "RESIDENCIA", image=pdf_teste())
-                campo("acesso").find_element(By.TAG_NAME, "button").click()
+                WebDriverWait(navegador, 35).until(lambda _: nome in campo("prontos").text)
             espera.until(lambda _: descricao in campo("fila").text)
             campo("fila").find_element(By.XPATH, ".//button[contains(.,'" + descricao + "')]").click()
             espera.until(lambda _: descricao in campo("titulo").text)
@@ -66,6 +101,8 @@ class Painel(unittest.TestCase):
             campo("motivo").send_keys("Análise fictícia")
             botao.click()
             navegador.switch_to.alert.dismiss()
+            grupo = "aprovados" if resultado == "APROVADO" else "rejeitados"
+            antes, prontos = total(grupo), total("prontos")
             self.assertIn("PENDENTE", campo("situacao").text)
             botao.click()
             navegador.switch_to.alert.accept()
@@ -74,6 +111,9 @@ class Painel(unittest.TestCase):
             self.assertIn("Análise fictícia", campo("historico").text)
             self.assertIn("painel-teste", campo("historico").text)
             self.assertNotIn(descricao, campo("fila").text)
+            self.assertIn(descricao, campo(grupo).text)
+            self.assertEqual(total(grupo), antes + 1)
+            self.assertEqual(total("prontos"), prontos - 1)
         self.assertEqual(campo("vigencia").text, "Sem conferência vigente.")
         for tipo in ("CNH", "FOTO_PERFIL"):
             linha = campo("documentos").find_element(By.XPATH, ".//li[.//input[@data-tipo='" + tipo + "']]")

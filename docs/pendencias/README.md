@@ -28,3 +28,7 @@
 As revisões anteriores já trataram a conversão de PDF antes da transação, os arquivos temporários do conversor, as revisões auditadas, o formato de `/me` e a repetição da suíte Driver. Os itens dos registros temáticos são trabalhos futuros ou decisões em aberto.
 
 O [diagnóstico ARQ-803](../arquitetura.md#catálogo-e-diagnóstico-arq-803) registra o catálogo, os riscos e as propostas de extração aguardando autorização.
+
+## Fila administrativa após a ARQ-803.0
+
+A PR #20 consolidou o diagnóstico documental. A PR #21 propõe a classificação operacional de cadastros. Permanecem em DA-02 a política de contatos e em DA-05 a verificação de autenticidade. As propostas de extração da ARQ-803 continuam independentes desta entrega.

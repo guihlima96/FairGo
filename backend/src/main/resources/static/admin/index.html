@@ -11,11 +11,18 @@
 <h1>Análise de cadastros</h1>
 <section>
 <form id="acesso"><label>Token administrativo<input id="token" type="password" autocomplete="off" required></label>
-<button>Carregar pendentes</button><button type="reset">Limpar</button></form>
+<button>Atualizar fila</button><button type="reset">Limpar</button></form>
 </section>
 <p id="aviso" role="status"></p>
 <div class="grade">
-<div><section><h2>Cadastros pendentes</h2><ul id="fila"></ul></section>
+<div><section><h2>Fila administrativa</h2>
+<label>Exibir <select id="filtro"><option value="">Todos</option><option value="MOTORISTA">Motoristas</option><option value="VEICULO">Veículos</option></select></label>
+<div id="fila">
+<h3>Incompletos <span data-total="incompletos"></span></h3><ul id="incompletos"></ul>
+<h3>Prontos para análise <span data-total="prontos"></span></h3><ul id="prontos"></ul>
+</div>
+<h3>Aprovados <span data-total="aprovados"></span></h3><ul id="aprovados"></ul>
+<h3>Rejeitados <span data-total="rejeitados"></span></h3><ul id="rejeitados"></ul></section>
 <details><summary>Consultar por ID</summary><form id="busca">
 <label>Tipo <select id="tipo"><option value="MOTORISTA">Motorista</option><option value="VEICULO">Veículo</option></select></label>
 <label>ID do cadastro<input id="codigo" required pattern="[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}"></label><button>Consultar</button></form></details></div>
