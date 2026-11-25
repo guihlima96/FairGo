@@ -87,7 +87,7 @@ Na conta de execução do backend, acrescente às permissões do Admin:
 | usuarios | SELECT e INSERT para o perfil do motorista |
 | contas_driver | SELECT e INSERT. Conceder `UPDATE (senha_hash)` para redefinição de senha, `UPDATE (email_verificado)` para confirmação e invalidação do e-mail e `UPDATE (celular_verificado)` para confirmação do celular. |
 | sessoes_driver | SELECT, INSERT e DELETE para autenticação, expiração e logout |
-| limites_driver | SELECT, INSERT, UPDATE em contador e DELETE para contabilizar e limpar tentativas |
+| limites_driver | SELECT, INSERT, UPDATE em contador e ate e DELETE para contabilizar e limpar tentativas |
 | recuperacoes_driver | SELECT, INSERT, UPDATE de digest, vinculo e expira_em para substituição, e DELETE para consumo ou invalidação |
 
 Use uma credencial de migração separada para a estrutura. A emissão futura de tokens e a marcação de contatos verificados dependem de fluxos próprios.
@@ -125,3 +125,5 @@ Aplicar `identidade.sql` após os scripts de cadastro, validação e Driver, com
 A auditoria contém o nome conferido e referências históricas, restritos ao Admin. As consultas Driver devolvem indicadores, sem esses metadados administrativos. O painel permite registrar e rever pareceres na seção de conferência visual. [Contrato da conferência](../docs/etapa-5-driver-admin.md#conferência-administrativa-de-identidade-e-nome)
 
 Aplicar a atualização aditiva de `driver.sql` antes de iniciar a versão com o novo emissor. Credenciais antigas sem vínculo demonstrável são recusadas e podem ser substituídas pelo emissor interno. Os gatilhos usam os privilégios do papel que executa a operação. Ao alterar `usuarios.email`, esse papel precisa de `UPDATE (email)` em `usuarios` e de `UPDATE (email_verificado)` em `contas_driver` para que o primeiro gatilho revogue a verificação. Tanto nessa troca quanto na revogação direta de `contas_driver.email_verificado`, o gatilho de invalidação precisa de `DELETE` em `recuperacoes_driver`. Os filtros por titular também exigem `SELECT (usuario_id)` nas tabelas consultadas pelos gatilhos, já coberto pelas permissões de leitura da tabela acima. Os parâmetros de produção e o expurgo de credenciais vencidas seguem em DA-03.
+
+A API Driver usa o par da conexão TCP para a cota de origem. O padrão explícito é `server.forward-headers-strategy=none`. A suíte HTTP de autenticação usa conexões de loopback IPv4 com endereços de origem em 127.0.0.0/8 e o banco descartável exclusivo. [Orçamentos de login, proxy e sessões](../docs/etapa-5-driver-admin.md#reforço-da-autenticação-driver)

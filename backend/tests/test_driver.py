@@ -3,12 +3,14 @@ import concurrent.futures
 import base64
 import hashlib
 import hmac
+import http.client
 import json
 import os
 import secrets
 import unittest
 import urllib.error
 import urllib.request
+from urllib.parse import urlsplit
 import uuid
 
 from test_validacao import URL, sql
@@ -126,9 +128,83 @@ class Driver(unittest.TestCase):
         self.assertEqual(api("GET", "/api/driver/me", token=token)[0], 401)
         sql(f"UPDATE sessoes_driver SET expira_em=now() WHERE usuario_id='{idb}'")
         self.assertEqual(api("GET", "/api/driver/me", token=outro)[0], 401)
-        for _ in range(8):
+        for _ in range(2):
             self.login(a["email"], "senha incorreta", 401)
         self.login(ida, a["senha"], 429)
+
+    def login_local(self, origem, identificador, senha, encaminhado=None):
+        destino = urlsplit(URL)
+        conexao = http.client.HTTPConnection(destino.hostname, destino.port, timeout=15,
+                                            source_address=(origem, 0))
+        cabecalhos = {"Content-Type": "application/json"}
+        if encaminhado:
+            cabecalhos.update({"Forwarded": "for=" + encaminhado, "X-Forwarded-For": encaminhado})
+        try:
+            conexao.request("POST", "/api/driver/sessoes",
+                            json.dumps({"identificador": identificador, "senha": senha}), cabecalhos)
+            resposta = conexao.getresponse()
+            corpo = resposta.read()
+            return resposta.status, json.loads(corpo) if corpo else {}
+        finally:
+            conexao.close()
+
+    def test_login_origens_e_rede_compartilhada(self):
+        sql("DELETE FROM limites_driver")
+        self.addCleanup(sql, "DELETE FROM limites_driver")
+        a, b = cadastro(), cadastro()
+        titular = self.criar(a)
+        self.criar(b)
+        origem = "127.0.0.2"
+        def tentar(conta, senha, ip=origem, encaminhado=None):
+            return self.login_local(ip, conta, senha, encaminhado)[0]
+        def expirar(chave):
+            digest = hashlib.sha256(chave.encode()).hexdigest()
+            sql(f"UPDATE limites_driver SET ate=now() WHERE chave='{digest}'")
+
+        for _ in range(2):
+            self.assertEqual(tentar(a["email"], "errada"), 401)
+        self.assertEqual(tentar(titular, "errada", encaminhado="192.0.2.17"), 429)
+        expirar("login-rajada:" + origem + ":" + titular)
+        for _ in range(2):
+            self.assertEqual(tentar(titular, "errada"), 401)
+        expirar("login-rajada:" + origem + ":" + titular)
+        self.assertEqual(tentar(titular, a["senha"]), 429)
+        self.assertEqual(tentar(b["email"], b["senha"]), 200)
+        self.assertEqual(tentar(titular, a["senha"], "127.0.0.3"), 200)
+        # O sucesso do titular devolve apenas a própria reserva.
+        for ip in ("127.0.0.3", "127.0.0.4"):
+            for _ in range(2):
+                self.assertEqual(tentar(a["email"], "errada", ip), 401)
+        self.assertEqual(tentar(titular, a["senha"], "127.0.0.5"), 429)
+        expirar("login-conta:" + titular)
+        self.assertEqual(tentar(titular, a["senha"], "127.0.0.5"), 200)
+
+    def test_login_concorrente_e_orcamentos(self):
+        sql("DELETE FROM limites_driver")
+        self.addCleanup(sql, "DELETE FROM limites_driver")
+        a = cadastro()
+        titular = self.criar(a)
+        def tentativa(identificador):
+            return self.login_local("127.0.0.2", identificador, "incorreta")
+        for identificador in (a["email"], cadastro()["email"]):
+            with concurrent.futures.ThreadPoolExecutor(6) as executor:
+                respostas = list(executor.map(tentativa, [identificador] * 6))
+            self.assertEqual(sorted(status for status, _ in respostas), [401,401,429,429,429,429])
+            erros = [(status, {k:v for k,v in corpo.items() if k != "timestamp"})
+                     for status, corpo in respostas]
+            if identificador == a["email"]:
+                modelo = dict(erros)
+            else:
+                for status, corpo in erros:
+                    self.assertEqual(corpo, modelo[status])
+        # Simula cotas já consumidas no PostgreSQL descartável.
+        for chave, limite in (("login-ip:127.0.0.2", 40), ("login-global", 600)):
+            digest = hashlib.sha256(chave.encode()).hexdigest()
+            sql(f"UPDATE limites_driver SET contador={limite} WHERE chave='{digest}'")
+            self.assertEqual(tentativa(cadastro()["email"])[0], 429)
+            sql(f"UPDATE limites_driver SET ate=now() WHERE chave='{digest}'")
+            # O par original ainda esgotou a rajada. Usar outro par da mesma origem.
+            self.assertEqual(tentativa(cadastro()["email"])[0], 401)
 
     def test_concorrencia_e_legado(self):
         dados = cadastro()

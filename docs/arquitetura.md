@@ -66,3 +66,7 @@ Enquanto a integração estiver pendente, a solicitação de verificação segue
 ### Recuperação de acesso
 
 `TokenOpaco` concentra geração aleatória e resumo SHA-256 reutilizados em sessão e recuperação, com prefixos distintos. `RecuperacaoDriver` aplica a política de conta e e-mail verificado e coordena a troca de senha e a revogação das sessões na mesma transação. O login e a redefinição compartilham o codificador de senhas. O emissor devolve ao chamador interno uma referência de mensagem, o destino obtido do banco e o token em memória. A finalidade é recuperação e o canal preparado é e-mail. Esses dados serão a entrada da coordenação de entrega prevista acima. Nenhuma rota serializa esse objeto. O futuro coordenador precisará tratar falhas após a emissão e evitar que uma repetição envie um token já substituído.
+
+### Controle de tentativas
+
+`ControleTentativas` implementa reservas de janela fixa, limpeza limitada e devolução associada ao vencimento original em PostgreSQL. Não conhece perfis, sessões ou transporte HTTP. `TentativasDriver` compõe as cotas por operação, conta, origem e sistema para a API Driver. O controlador identifica a conexão e o titular e confirma a devolução das reservas pessoais na transação de abertura da sessão. A derivação da senha ocorre fora da transação de admissão. O orçamento global é compartilhado pelas instâncias e sua linha pode sofrer contenção; medir em carga antes da exposição pública.
