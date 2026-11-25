@@ -106,13 +106,16 @@ class CadastroCompartilhado {
     }
 
     private void reabrir(Alvo alvo, UUID id, String anterior, Principal responsavel) {
-        if (!anterior.equals("PENDENTE")) registrar(alvo,id,"PENDENTE","Cadastro atualizado",responsavel,null);
+        if (!anterior.equals("PENDENTE")) registrar(alvo,id,"PENDENTE","Cadastro atualizado",responsavel,null,null);
     }
 
-    void registrar(Alvo alvo, UUID id, String status, String motivo, Principal responsavel, UUID[] revisoes) {
+    void registrar(Alvo alvo, UUID id, String status, String motivo, Principal responsavel, UUID[] revisoes,
+                   MotivoPublico.Selecao orientacao) {
         db.update("UPDATE " + alvo.tabela + " SET situacao=? WHERE id=?", status, id);
-        db.update("INSERT INTO decisoes_cadastro (" + alvo.coluna + ",situacao,motivo,responsavel,revisoes_conferidas) VALUES (?,?,?,?,?)",
-                id,status,motivo,responsavel.getName(),revisoes);
+        db.update("INSERT INTO decisoes_cadastro (" + alvo.coluna + ",situacao,motivo,responsavel,revisoes_conferidas,"
+                + "codigo_publico,documento_publico,revisao_afetada) VALUES (?,?,?,?,?,?,?,?)",
+                id,status,motivo,responsavel.getName(),revisoes, orientacao == null ? null : orientacao.codigo(),
+                orientacao == null ? null : orientacao.documento(), orientacao == null ? null : orientacao.revisao());
     }
 
 }

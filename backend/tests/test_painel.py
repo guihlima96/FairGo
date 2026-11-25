@@ -95,6 +95,9 @@ class Painel(unittest.TestCase):
                 campo("fechar").click()
             if conferir_identidade:
                 campo("identidade").click()
+            if resultado == "REJEITADO":
+                Select(campo("codigoPublico")).select_by_value("RESIDENCIA_INVALIDA")
+                self.assertTrue(campo("docPublico").get_attribute("value"))
             botao = campo("decisao").find_element(By.CSS_SELECTOR, "button[value='" + resultado + "']")
             botao.click()
             self.assertFalse(campo("motivo").get_property("validity")["valid"])
@@ -110,6 +113,9 @@ class Painel(unittest.TestCase):
             self.assertIn(resultado, campo("situacao").text)
             self.assertIn("Análise fictícia", campo("historico").text)
             self.assertIn("painel-teste", campo("historico").text)
+            if resultado == "REJEITADO":
+                self.assertIn("RESIDENCIA_INVALIDA", campo("historico").text)
+                self.assertIn("RESIDENCIA_INVALIDA", campo("rejeitados").text)
             self.assertNotIn(descricao, campo("fila").text)
             self.assertIn(descricao, campo(grupo).text)
             self.assertEqual(total(grupo), antes + 1)

@@ -40,6 +40,75 @@ class DocumentosDriver(unittest.TestCase):
         return [cnh] + [enviar_arquivo(rota + tipo, token)["id"]
                         for tipo in ("ANTECEDENTES", "FOTO_PERFIL", "RESIDENCIA")]
 
+    def test_orientacao_publica(self):
+        titular, token = self.motorista()
+        _, outro = self.motorista()
+        alvo = "validacao/MOTORISTA/" + titular
+        rota = "/api/driver/me/situacao"
+        foto = enviar_arquivo("/api/driver/me/documentos/FOTO_PERFIL", token)["id"]
+        alheia = enviar_arquivo("/api/driver/me/documentos/FOTO_PERFIL", outro)["id"]
+        motivo = {"codigo": "FOTO_INADEQUADA", "documento": "FOTO_PERFIL", "revisao": foto}
+        decisao = {"situacao": "REJEITADO", "motivo": "anotacao-interna-22", "orientacao": motivo}
+        def decidir_com(status, **campos):
+            call(alvo + "/decisoes", status, dict(decisao, orientacao=dict(motivo, **campos)), "POST")
+        decidir_com(400, codigo="TEXTO_LIVRE")
+        decidir_com(400, codigo="CRLV_INVALIDO")
+        decidir_com(400, documento="CNH")
+        decidir_com(400, revisao=None)
+        decidir_com(409, revisao=alheia)
+        call(alvo + "/decisoes", 400, dict(decisao, situacao="APROVADO"), "POST")
+        call(alvo + "/decisoes", 401, decisao, "POST", token=token)
+        self.assertEqual(call(alvo + "/historico", 200), [])
+        decidir_com(201)
+        resposta = request(rota, 200, token=token)
+        analise = resposta["motorista"]["analise"]
+        self.assertEqual(analise, {"situacao": "REJEITADO", "codigoPublico": "FOTO_INADEQUADA",
+                                   "documentoAfetado": "FOTO_PERFIL",
+                                   "orientacaoPublica": "Atualize sua foto de perfil com uma imagem nítida do rosto."})
+        for privado in ("anotacao-interna-22", "admin-integracao", "historico", "responsavel"):
+            self.assertNotIn(privado, str(resposta))
+        self.assertNotIn("FOTO_INADEQUADA", str(request(rota, 200, token=outro)))
+        enviar_arquivo("/api/driver/me/documentos/FOTO_PERFIL", token)
+        self.assertEqual(request(rota, 200, token=token)["motorista"]["analise"],
+                         {"situacao": "PENDENTE", "orientacaoPublica": None})
+        evento, abertura = call(alvo + "/historico", 200)
+        self.assertEqual((evento["codigo_publico"], evento["revisao_afetada"]), ("FOTO_INADEQUADA", foto))
+        self.assertEqual(abertura["situacao"], "PENDENTE")
+        decidir_com(409)  # revisão substituída
+        decidir(alvo, [], 201, "REJEITADO")
+        self.assertNotIn("codigoPublico", request(rota, 200, token=token)["motorista"]["analise"])
+
+    def test_orientacao_veiculo_concorrente(self):
+        _, token = self.motorista()
+        v = request("/api/driver/veiculos", 201, {"placa": self.placa()}, "POST", token)["id"]
+        crlv = "/api/driver/veiculos/" + v + "/crlv"
+        revisao = enviar_arquivo(crlv, token)["id"]
+        alvo = "validacao/VEICULO/" + v
+        causa = {"codigo": "CRLV_INVALIDO", "documento": "CRLV", "revisao": revisao}
+        decisao = {"situacao": "REJEITADO", "motivo": "Conferência interna", "orientacao": causa}
+        inicio = Barrier(2, timeout=10)
+        def rejeitar():
+            inicio.wait()
+            call(alvo + "/decisoes", (201, 409), decisao, "POST")
+        def corrigir():
+            inicio.wait()
+            return enviar_arquivo(crlv, token)["id"]
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            futuro = executor.submit(rejeitar)
+            atual = executor.submit(corrigir).result()
+            futuro.result()
+        consulta = lambda: request("/api/driver/me/situacao", 200, token=token)["veiculos"][0]["analise"]
+        self.assertEqual(consulta(), {"situacao": "PENDENTE", "orientacaoPublica": None})
+        eventos = call(alvo + "/historico", 200)
+        self.assertIn([e["situacao"] for e in eventos], ([], ["REJEITADO", "PENDENTE"]))
+        if eventos:
+            self.assertEqual(eventos[0]["revisao_afetada"], revisao)
+        call(alvo + "/decisoes", 409, decisao, "POST")
+        causa["revisao"] = atual
+        call(alvo + "/decisoes", 201, decisao, "POST")
+        self.assertEqual(consulta()["codigoPublico"], "CRLV_INVALIDO")
+        self.assertEqual(consulta()["documentoAfetado"], "CRLV")
+
     def test_conferencia_identidade(self):
         titular, token = self.motorista()
         _, outro = self.motorista()

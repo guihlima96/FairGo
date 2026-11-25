@@ -92,12 +92,23 @@ Os envios retornam a revisão (id, tipo, validade e ear). A fila e as decisões 
 | motorista | ID próprio, análise atual, indicadores reais de verificação de nome, e-mail e celular e lista de documentos pessoais. Um indicador falso significa verificação pendente. |
 | motorista.documentos | Cada item contém tipo, obrigatorio, revisaoAtual, validade e ear. Revisão nula indica ausência. Um obrigatório ausente precisa ser enviado. O toxicológico é facultativo. |
 | veiculos | Uma entrada por veículo do titular com id, placa, análise, dadosTecnicosInformados e metadados do CRLV. Lista vazia indica ausência de veículo. |
-| analise | Situação administrativa PENDENTE, APROVADO ou REJEITADO. Apenas REJEITADO recebe orientação pública fixa. A reabertura remove essa orientação. |
+| analise | Situação administrativa PENDENTE, APROVADO ou REJEITADO. Apenas REJEITADO recebe orientação pública vigente. A reabertura remove essa orientação. |
 | preElegibilidade | motoristaEVeiculoAprovados indica motorista aprovado com ao menos um veículo próprio aprovado. Conta decisões administrativas vigentes, inclusive legadas. autorizadoParaCorridas permanece falso nesta etapa. |
 
 A consulta não reavalia decisões nem atesta autenticidade, validade atual ou identidade. O cliente pode indicar o documento ausente pela combinação de obrigatorio e revisaoAtual. A aprovação administrativa não altera os indicadores de verificação.
 
-**Proposta de comunicação da rejeição.** Exibir “Revise os dados e documentos deste cadastro.” Para informar uma causa específica em etapa futura, propor um catálogo fechado de códigos públicos com mensagens previamente revisadas e seleção explícita pelo Admin. Decisões antigas ou sem código recebem a orientação genérica. O texto livre, os responsáveis e o histórico continuam exclusivos do Admin.
+**Comunicação da rejeição (PR #22).** O Admin consulta `GET /api/admin/validacao/motivos-publicos/{alvo}`. Cada opção contém código, mensagem padronizada e tipos de documento aplicáveis. Na decisão REJEITADO o painel envia, por exemplo, `"orientacao":{"codigo":"CRLV_INVALIDO","documento":"CRLV","revisao":"<UUID atual>"}`, junto da justificativa interna obrigatória. Causas gerais usam somente o código. Clientes anteriores podem omitir a orientação. Combinações inválidas retornam 400 e uma revisão substituída ou alheia retorna 409. O registro da decisão, do motivo público e da revisão é atômico.
+
+| Código público | Aplicação |
+|---|---|
+| CNH_VENCIDA, CNH_SEM_EAR, CNH_NAO_DEFINITIVA | Revisão atual da CNH do motorista |
+| FOTO_INADEQUADA, RESIDENCIA_INVALIDA | Foto ou comprovante de residência do motorista, respectivamente |
+| CRLV_INVALIDO | Revisão atual do CRLV do veículo |
+| DOCUMENTO_ILEGIVEL | Documento atual do cadastro selecionado |
+| VEICULO_INELEGIVEL | Dados do veículo |
+| DIVERGENCIA_CADASTRAL, OUTROS | Cadastro de motorista ou veículo |
+
+Em `GET /api/driver/me/situacao`, `analise.orientacaoPublica` contém a mensagem padronizada. Uma rejeição com código acrescenta `codigoPublico` e, quando aplicável, `documentoAfetado`. A seleção considera o último evento daquele cadastro. Na rejeição legada sem código a mensagem continua “Revise os dados e documentos deste cadastro.”. Ao reabrir, a mensagem volta a null e os campos específicos deixam de aparecer. Justificativa, autoria, histórico e vínculo histórico com a revisão permanecem na API administrativa.
 
 O [registro de pendências do Driver](pendencias/driver-admin.md) acompanha câmera, autenticidade, verificação de contatos e aprovações antigas. Os [itens de operação e segurança](pendencias/operacao-seguranca.md) incluem cotas de upload, isolamento do conversor, retenção e validação com documentos reais antes da exposição pública.
 

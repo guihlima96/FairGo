@@ -102,6 +102,7 @@ function mostrarFila() {
             ". Ausentes: " + (cadastro.ausentes.join(", ") || "nenhum") + "." +
             (cadastro.tipo === "VEICULO" ? " Dados técnicos " + (cadastro.dadosTecnicosPresentes ? "presentes." : "ausentes.") : "");
         linha.append(evidencias);
+        if (cadastro.codigoPublico) linha.append("Motivo público: " + cadastro.codigoPublico);
     }
     for (const grupo of grupos) document.querySelector('[data-total="' + grupo + '"]').textContent = contagens[grupo];
 }
@@ -130,7 +131,11 @@ async function consultar(tipo, id, nome) {
     const rota = tipo + "/" + encodeURIComponent(id);
     const cadastro = await (await api(rota)).json();
     const historico = await (await api(rota + "/historico")).json();
-    selecionado = {tipo, id, nome, rota, versaoNome: cadastro.versaoNome};
+    const motivos = cadastro.situacao === "PENDENTE" ? await (await api("motivos-publicos/" + tipo)).json() : [];
+    selecionado = {tipo, id, nome, rota, versaoNome: cadastro.versaoNome, motivos, documentos: cadastro.documentos};
+    el("codigoPublico").replaceChildren(new Option("Selecione para rejeitar", ""));
+    for (const m of motivos) el("codigoPublico").add(new Option(m.codigo.replaceAll("_", " "), m.codigo));
+    mostrarOrientacao();
     el("conferencia").hidden = tipo !== "MOTORISTA";
     if (tipo === "MOTORISTA") {
         const eventos = await (await api(rota + "/conferencias-identidade")).json();
@@ -193,12 +198,22 @@ async function consultar(tipo, id, nome) {
         }
     }
     if (!cadastro.documentos.length) item("documentos", "Nenhum documento cadastrado.");
-    for (const h of historico) item("historico", [new Date(h.data).toLocaleString("pt-BR"), h.situacao, h.responsavel, h.motivo].join(" · "));
+    for (const h of historico) item("historico", [new Date(h.data).toLocaleString("pt-BR"), h.situacao, h.responsavel, h.motivo, h.codigo_publico, h.documento_publico].filter(Boolean).join(" · "));
     if (!historico.length) item("historico", "Nenhuma decisão registrada.");
     el("decisao").hidden = !pendente;
     el("resultado").hidden = false;
     el("aviso").textContent = "Consulta concluída.";
 }
+function mostrarOrientacao() {
+    const opcao = selecionado.motivos.find(m => m.codigo === el("codigoPublico").value);
+    el("mensagemPublica").textContent = opcao?.mensagem || "";
+    const documentos = selecionado.documentos.filter(d => opcao?.documentos.includes(d.tipo));
+    el("rotuloDocumento").hidden = !opcao?.documentos.length;
+    el("docPublico").replaceChildren(new Option("Selecione o documento", ""));
+    for (const doc of documentos) el("docPublico").add(new Option(doc.tipo, doc.id));
+    if (documentos.length === 1) el("docPublico").value = documentos[0].id;
+}
+el("codigoPublico").onchange = mostrarOrientacao;
 el("acesso").onsubmit = e => {
     e.preventDefault();
     executar(async () => { limparDetalhe(); await fila(); el("aviso").textContent = "Fila atualizada."; });
@@ -244,10 +259,18 @@ el("decisao").onsubmit = e => {
     if (situacao === "APROVADO" && !exigidos.every(t => marcados.includes(t))) {
         el("aviso").textContent = "Visualize e marque todos os documentos exigidos antes de aprovar."; return;
     }
+    let orientacao;
+    if (situacao === "REJEITADO") {
+        const opcao = selecionado.motivos.find(m => m.codigo === el("codigoPublico").value);
+        if (!opcao) { el("aviso").textContent = "Selecione o motivo público."; return; }
+        const doc = selecionado.documentos.find(d => d.id === el("docPublico").value);
+        if (opcao.documentos.length && !doc) { el("aviso").textContent = "Indique a revisão do documento."; return; }
+        orientacao = {codigo: opcao.codigo, documento: doc?.tipo, revisao: doc?.id};
+    }
     if (!window.confirm("Confirmar " + (situacao === "APROVADO" ? "aprovação" : "rejeição") + " de " + nome + "?\n" + motivo)) return;
     executar(async () => {
         await api(rota + "/decisoes", {method: "POST", headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({situacao, motivo, documentosConferidos, identidadeConferida})});
+            body: JSON.stringify({situacao, motivo, documentosConferidos, identidadeConferida, orientacao})});
         limparDetalhe();
         try {
             await fila();
