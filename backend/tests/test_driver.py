@@ -148,6 +148,9 @@ class Driver(unittest.TestCase):
 
     def test_recuperacao(self):
         a = cadastro()
+        b = cadastro()
+        outro = self.criar(b)
+        sessao_alheia = self.login(outro, b["senha"])
         usuario = self.criar(a)
         sessao = self.login(usuario, a["senha"])
         for email in (a["email"], cadastro()["email"]):
@@ -156,7 +159,9 @@ class Driver(unittest.TestCase):
         # Fixture do futuro emissor, criada somente no banco descartável.
         token = "rec_" + secrets.token_hex(32)
         digest = hashlib.sha256(token.encode()).hexdigest()
-        sql(f"INSERT INTO recuperacoes_driver VALUES ('{digest}','{usuario}',now()+interval '1 hour')")
+        vinculo = hashlib.sha256("\n".join((usuario, a["email"], token)).encode()).hexdigest()
+        sql(f"""INSERT INTO recuperacoes_driver(digest,usuario_id,expira_em,vinculo)
+                VALUES ('{digest}','{usuario}',now()+interval '1 hour','{vinculo}')""")
         dados = {"token":token, "novaSenha":secrets.token_hex(16)}
         def confirmar():
             return api("POST", "/api/driver/recuperacao/confirmacao", dados)[0]
@@ -171,6 +176,26 @@ class Driver(unittest.TestCase):
         self.assertEqual(api("GET", "/api/driver/me", token=sessao)[0], 401)
         self.login(usuario, a["senha"], 401)
         self.login(usuario, dados["novaSenha"])
+        self.assertEqual(api("GET", "/api/driver/me", token=sessao_alheia)[0], 200)
+        self.login(outro, b["senha"])
+        # Solicitações públicas, inclusive simultâneas para contato verificado, continuam sem emissão.
+        with concurrent.futures.ThreadPoolExecutor(2) as pool:
+            respostas = list(pool.map(lambda _: api("POST", "/api/driver/recuperacao",
+                                                     {"email": a["email"]}), range(2)))
+        self.assertEqual(respostas, [(202, None), (202, None)])
+        self.assertEqual(sql(f"SELECT count(*) FROM recuperacoes_driver WHERE usuario_id='{usuario}'"), "0")
+        invalido = "rec_" + secrets.token_hex(32)
+        for valor in (invalido, invalido + "x"):
+            codigo, resposta = api("POST", "/api/driver/recuperacao/confirmacao",
+                                   {"token": valor, "novaSenha": dados["novaSenha"]})
+            self.assertEqual(codigo, 400)
+            for segredo in (invalido, dados["novaSenha"]):
+                self.assertNotIn(segredo, str(resposta))
+        if os.environ.get("FAIRGO_TEST_BACKEND_LOG"):
+            with open(os.environ["FAIRGO_TEST_BACKEND_LOG"], encoding="utf-8") as arquivo:
+                log = arquivo.read()
+            self.assertFalse(any(s in log for s in (token, invalido, dados["novaSenha"], a["email"])),
+                             "Dado confidencial encontrado no log do backend")
 
 
 if __name__ == "__main__":

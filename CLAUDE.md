@@ -15,7 +15,7 @@ mvn -f backend/pom.xml compile
 mvn -B -f backend/pom.xml verify
 ```
 
-A fase `verify` inclui testes Maven e empacotamento. A suíte JUnit de códigos de contato usa PostgreSQL quando `PGDATABASE` termina em `_test`. Configure as variáveis de teste antes de `verify` para executá-la. Para reproduzir a regressão completa:
+A fase `verify` inclui testes Maven e empacotamento. As suítes JUnit de verificação de contatos e recuperação interna usam PostgreSQL quando `PGDATABASE` termina em `_test`. Configure as variáveis de teste antes de `verify` para executá-las. Para reproduzir a regressão completa:
 
 1. Prepare PostgreSQL e psql com um banco descartável exclusivo terminado em `_test`. Configure as variáveis JDBC e a chave de documentos conforme o [guia do backend](backend/README.md). Inicie o servidor com `mvn -f backend/pom.xml spring-boot:run`.
 2. Em outro terminal, na raiz, aponte `PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER` e `PGPASSWORD` para o mesmo banco. Configure `PSQL` se necessário. Para a suíte de confirmação HTTP, forneça a mesma `FAIRGO_CONTACT_KEY` temporária (32 bytes aleatórios em Base64) ao servidor e ao processo Python. Aguarde o painel responder. Use Python 3 em ambiente virtual e Chrome com driver compatível disponível para Selenium.
