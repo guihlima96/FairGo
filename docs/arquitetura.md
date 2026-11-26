@@ -7,7 +7,7 @@ O FairGo evolui como um **monólito modular**. Admin, Driver e Passenger são fr
 | Frente | Implementação na base de referência | Evolução prevista |
 |---|---|---|
 | Admin | Painel HTML/JavaScript em `/admin/index.html` e API REST em `/api/admin/**`. Cadastra pessoas e veículos, consulta evidências, registra decisões e audita a conferência visual de identidade. | Evolução das ferramentas de análise e revalidação. |
-| Driver | API REST em `/api/driver/**` para contas, sessões, veículos, documentos, confirmação de contatos e consulta de situação e identidade. | Entrega real de códigos e tokens, ativação das políticas aprovadas e aplicativo Flutter. |
+| Driver | API REST em `/api/driver/**` para contas, sessões, veículos, documentos, confirmação de contatos e consulta de situação e identidade. | Entrega real de códigos e tokens, ativação das políticas aprovadas e evolução do cliente Flutter. |
 | Passenger | O Admin pode cadastrar um usuário com perfil `PASSAGEIRO`. | Aplicativo Flutter e operações próprias do passageiro. |
 
 Corridas, tarifas e cancelamentos têm documentação de produto. O uso de WebSocket depende de um caso de uso definido. Consulte a [especificação](../FAIRGO_SPEC.md) e o [contrato REST Driver/Admin](etapa-5-driver-admin.md).
@@ -142,3 +142,7 @@ Para documentos e identidade, preservar os vínculos em `documentos_cadastro`, `
 Usar PostgreSQL descartável nos testes JUnit de contato e recuperação. Preservar as suítes HTTP para conta legada, login por dois identificadores, redes compartilhadas, concorrência, expiração, logout, isolamento de papéis, reenvio e mudança de destino. Incluir as respostas de recuperação 202/204/400, rejeição do segundo consumo, revogação das sessões do titular e sobrevivência das sessões de outra conta. Na CI, conferir Maven verify, as três rodadas Driver, Admin, Selenium e integração Driver/Admin. Esses são critérios para mudanças futuras; o diagnóstico é estático.
 
 Continuam abertas **OS-01** (cotas, abuso e isolamento operacional do conversor), **OS-02** (legibilidade e tempo com amostras autorizadas), **OS-03** (retenção, acesso e backups), **OS-04** (rotação, recifragem e restauração), **OS-05** (avaliação de antivírus) e **DA-05** (autenticidade e assinaturas digitais). O subprocesso herda as permissões do backend. Para autenticação, **OS-06** acompanha proxy, redes compartilhadas, calibração e contenção da cota global. [Operação e segurança](pendencias/operacao-seguranca.md) · [Driver e Admin](pendencias/driver-admin.md)
+
+### Aplicativo FairGo Driver
+
+O cliente Android reside em `apps/driver`. A entrada apresenta a marca e as rotas Entrar e Criar conta. Em `lib/core` ficam o tema, as rotas e a configuração do prefixo REST `/api/driver/`. As telas ficam em `features` e o símbolo visual em `shared`. A navegação funciona offline. A aplicação não solicita sessão nem transmite dados nesta etapa. O backend compartilhado continua responsável pelas regras e pela autorização. [Execução e teste por USB](../apps/driver/README.md)
