@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 class AccessPage extends StatelessWidget {
   const AccessPage({super.key, required this.title, required this.message});
