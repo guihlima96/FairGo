@@ -14,7 +14,11 @@ void main() {
       await tester.tap(find.text(label));
       await tester.pumpAndSettle();
       expect(find.widgetWithText(AppBar, label), findsOneWidget);
-      expect(find.textContaining('próxima etapa'), findsOneWidget);
+      if (label == 'Entrar') {
+        expect(find.byType(TextField), findsNWidgets(2));
+      } else {
+        expect(find.textContaining('pr�xima etapa'), findsOneWidget);
+      }
       await tester.tap(find.byTooltip('Voltar'));
       await tester.pumpAndSettle();
       expect(find.text('FairGo Driver'), findsOneWidget);
