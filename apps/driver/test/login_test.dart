@@ -43,7 +43,7 @@ class FakeApi extends DriverApi {
 }
 
 void main() {
-  testWidgets('protege senha, envia uma vez, identifica e encerra sess�o', (
+  testWidgets('protege senha, envia uma vez, identifica e encerra sessão', (
     tester,
   ) async {
     final api = FakeApi();
@@ -63,7 +63,7 @@ void main() {
     await tester.tap(find.byTooltip('Mostrar senha'));
     await tester.pump();
     expect(tester.widget<TextField>(field).obscureText, isFalse);
-    await tester.enterText(field, 'senha fict�cia');
+    await tester.enterText(field, 'senha fictícia');
     final button = find.widgetWithText(FilledButton, 'Entrar');
     await tester.ensureVisible(button);
     await tester.tap(button);
@@ -81,7 +81,7 @@ void main() {
     expect(store.value, isNull);
     expect(find.byType(TextField), findsNWidgets(2));
   });
-  testWidgets('descarta sess�o expirada ao reabrir', (tester) async {
+  testWidgets('descarta sessão expirada ao reabrir', (tester) async {
     final store = MemoryStore()..value = Grant('antigo', DateTime.utc(2020));
     await tester.pumpWidget(
       MaterialApp(
@@ -89,7 +89,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.textContaining('Sess�o expirada'), findsOneWidget);
+    expect(find.textContaining('Sessão expirada'), findsOneWidget);
     expect(store.value, isNull);
   });
 }

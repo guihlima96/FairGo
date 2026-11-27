@@ -72,7 +72,7 @@ public class MainActivity extends FlutterActivity {
                     }
                     result.success(null);
                 } catch (Exception ex) {
-                    result.error("session_storage", "Armazenamento indispon�vel.", null);
+                    result.error("session_storage", "Armazenamento indisponível.", null);
                 }
             });
     }

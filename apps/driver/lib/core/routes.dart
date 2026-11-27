@@ -25,7 +25,7 @@ abstract final class DriverRoutes {
     signup: (_) => const AccessPage(
       title: 'Criar conta',
       message:
-          'O cadastro de motoristas estar� dispon�vel em uma pr�xima etapa.',
+          'O cadastro de motoristas estará disponível em uma próxima etapa.',
     ),
   };
 }

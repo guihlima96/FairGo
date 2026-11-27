@@ -37,14 +37,16 @@ class DriverApi {
     Map<String, String>? body,
   }) async {
     final base = config.base;
-    if (base == null)
-      throw const DriverFailure('Configure a conex�o com o FairGo.');
+    if (base == null) {
+      throw const DriverFailure('Configure a conexão com o FairGo.');
+    }
     final client = HttpClient();
     Future<Map<String, dynamic>> send() async {
       final request = await client.openUrl(method, base.resolve(path));
       request.followRedirects = false;
-      if (token != null)
+      if (token != null) {
         request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
+      }
       if (body != null) {
         request.headers.contentType = ContentType.json;
         request.add(utf8.encode(jsonEncode(body)));
@@ -60,8 +62,8 @@ class DriverApi {
         case 401:
           throw DriverFailure(
             token == null
-                ? 'Identificador ou senha inv�lidos.'
-                : 'Sess�o encerrada. Entre novamente.',
+                ? 'Identificador ou senha inválidos.'
+                : 'Sessão encerrada. Entre novamente.',
             response.statusCode,
           );
         case 429:
@@ -70,7 +72,7 @@ class DriverApi {
             429,
           );
         default:
-          throw const DriverFailure('Servidor indispon�vel. Tente novamente.');
+          throw const DriverFailure('Servidor indisponível. Tente novamente.');
       }
     }
 
@@ -78,7 +80,7 @@ class DriverApi {
       return await send().timeout(const Duration(seconds: 20));
     } on SocketException {
       throw const DriverFailure(
-        'Sem conex�o com o servidor. Confira a rede ou o cabo USB.',
+        'Sem conexão com o servidor. Confira a rede ou o cabo USB.',
       );
     } on TimeoutException {
       throw const DriverFailure(

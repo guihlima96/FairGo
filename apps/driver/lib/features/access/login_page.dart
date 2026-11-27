@@ -40,9 +40,9 @@ class _LoginPageState extends State<LoginPage> with WidgetsBindingObserver {
     } on DriverFailure catch (error) {
       notice = error.message;
     } on PlatformException {
-      notice = 'N�o foi poss�vel acessar o armazenamento protegido.';
+      notice = 'Não foi possível acessar o armazenamento protegido.';
     } catch (_) {
-      notice = 'N�o foi poss�vel concluir o acesso. Tente novamente.';
+      notice = 'Não foi possível concluir o acesso. Tente novamente.';
     } finally {
       if (mounted) setState(() => busy = false);
     }
@@ -78,23 +78,25 @@ class _LoginPageState extends State<LoginPage> with WidgetsBindingObserver {
       }
     }
     await forget();
-    throw const DriverFailure('Sess�o expirada. Entre novamente.');
+    throw const DriverFailure('Sessão expirada. Entre novamente.');
   }
 
   void expire() {
-    if (mounted && !busy)
+    if (mounted && !busy) {
       run(() async {
         await forget();
-        notice = 'Sess�o expirada. Entre novamente.';
+        notice = 'Sessão expirada. Entre novamente.';
       });
+    }
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed &&
         grant != null &&
-        !grant!.expires.isAfter(DateTime.now()))
+        !grant!.expires.isAfter(DateTime.now())) {
       expire();
+    }
   }
 
   void login() {
@@ -107,6 +109,7 @@ class _LoginPageState extends State<LoginPage> with WidgetsBindingObserver {
       final saved = await widget.api.login(id.text.trim(), password.text);
       if (!mounted) return;
       password.clear();
+      hidden = true;
       await widget.store.save(saved);
       if (mounted) await identify(saved);
     });
@@ -117,10 +120,11 @@ class _LoginPageState extends State<LoginPage> with WidgetsBindingObserver {
     final current = grant!;
     run(() async {
       await forget();
+      id.clear();
       try {
         await widget.api.logout(current.token);
       } on DriverFailure catch (error) {
-        if (error.status != 401) notice = 'Voc� saiu deste aparelho. A revoga��o no servidor n�o p�de ser confirmada.';
+        if (error.status != 401) notice = 'Você saiu deste aparelho. A revogação no servidor não pôde ser confirmada.';
       }
     });
   }
@@ -164,7 +168,7 @@ class _LoginPageState extends State<LoginPage> with WidgetsBindingObserver {
                 autocorrect: false,
                 enableSuggestions: false,
                 decoration: const InputDecoration(
-                  labelText: 'N�mero de cadastro ou e-mail',
+                  labelText: 'Número de cadastro ou e-mail',
                 ),
               ),
               TextField(
