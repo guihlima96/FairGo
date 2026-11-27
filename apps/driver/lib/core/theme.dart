@@ -7,10 +7,7 @@ const electricBlue = Color(0xff1854df);
 final driverTheme = ThemeData(
   useMaterial3: true,
   scaffoldBackgroundColor: background,
-  colorScheme: ColorScheme.fromSeed(
-    seedColor: electricBlue,
-    brightness: Brightness.dark,
-  ).copyWith(
+  colorScheme: const ColorScheme.dark(
     primary: electricBlue,
     onPrimary: Colors.white,
     surface: background,
