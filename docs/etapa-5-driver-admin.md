@@ -130,7 +130,7 @@ Proposta de contrato para o Driver autenticado. O servidor identifica a conta pe
 
 | Operação em /api/driver/me/verificacoes/{canal} | Comportamento |
 |---|---|
-| POST /solicitacoes | Hoje retorna 503 e não cria desafio. Após escolher o provedor, propõe-se 202 com o UUID do desafio depois da aceitação da entrega, 429 para limites e 409 para contato já verificado. O código segue somente para o contato cadastrado. |
+| POST /solicitacoes | Desativado retorna 503. Na homologação Brevo retorna 202 com o UUID do desafio depois da aceitação da entrega, 429 para limites e 409 para contato já verificado. O código segue somente para o contato cadastrado. |
 | POST /confirmacao | JSON com desafio (UUID) e codigo (string de oito dígitos). 204 confirma o canal da sessão. 400 para entrada, código ou desafio inválido, substituído, esgotado, vencido ou consumido. Com a chave ausente, a confirmação fica indisponível (503). |
 | Ambas | Sem sessão Driver válida, 401. A resposta não contém o destino nem o código secreto. GET /me e GET /me/situacao mantêm os indicadores independentes. |
 
@@ -196,3 +196,7 @@ A abertura do FairGo Driver oferece Entrar e Criar conta. As duas rotas apresent
 ## Login Flutter — PR #25
 
 Ao abrir Entrar, o app valida a sessão armazenada consultando o perfil. O prazo absoluto vem de expiraEm. O cliente descarta a sessão vencida ou recusada e exige novo login. Sair apaga a credencial local e solicita revogação da sessão apresentada. Uma falha de rede no logout pode deixar a sessão remota válida até a expiração. A área autenticada exibe apenas o nome.
+
+## INT-001.1 — entrega de e-mail
+
+O modo padrão preserva o comportamento sem envios. A homologação habilita a verificação de e-mail e a recuperação pelo destino previamente verificado. [Configuração, contratos e testes manuais](homologacao-email.md)

@@ -44,6 +44,26 @@ class VerificacaoContatoTest {
         db.update("DELETE FROM usuarios WHERE id=?", titular);
     }
 
+    @Test void adaptadorSubstituivelEntregaCodigoSemVerificarAutomaticamente() {
+        var recebida = new java.util.concurrent.atomic.AtomicReference<br.fairgo.notificacoes.Mensagem>();
+        String email = titular + "@example.invalid";
+        var canal = new br.fairgo.notificacoes.EmailHomologacao(m -> {
+            recebida.set(m);
+            return br.fairgo.notificacoes.Resultado.ACEITO;
+        }, Set.of(email));
+        var fluxo = new EntregaDriver(servico, null, canal, 600);
+        try {
+            assertThrows(ResponseStatusException.class, () -> fluxo.verificar(titular, CELULAR));
+            UUID desafio = fluxo.verificar(titular, EMAIL);
+            assertEquals(desafio, recebida.get().referencia());
+            assertEquals(email, recebida.get().destino());
+            assertFalse(db.queryForObject("SELECT email_verificado FROM contas_driver WHERE usuario_id=?",Boolean.class,titular));
+            var codigo = java.util.regex.Pattern.compile("[0-9]{8}").matcher(recebida.get().texto());
+            assertTrue(codigo.find());
+            assertTrue(servico.confirmar(titular, EMAIL, desafio, codigo.group()));
+        } finally { fluxo.encerrar(); }
+    }
+
     @Test void limitesReenvioExpiracaoEUsoUnico() {
         var antigo = servico.emitir(titular, EMAIL);
         assertEquals(429, assertThrows(ResponseStatusException.class,

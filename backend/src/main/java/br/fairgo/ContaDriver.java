@@ -39,10 +39,12 @@ class ContaDriver {
     private final PasswordEncoder senhas;
     private final String hashFicticio;
     private final RecuperacaoDriver recuperacao;
+    private final EntregaDriver entrega;
     private final TentativasDriver tentativas;
 
     ContaDriver(JdbcTemplate db, TransactionTemplate tx, PasswordEncoder senhas, RecuperacaoDriver recuperacao,
-                TentativasDriver tentativas) {
+                TentativasDriver tentativas, EntregaDriver entrega) {
+        this.entrega = entrega;
         this.db = db;
         this.tx = tx;
         this.senhas = senhas;
@@ -132,7 +134,7 @@ class ContaDriver {
     @ResponseStatus(ACCEPTED)
     public void solicitar(@Valid @RequestBody Pedido pedido, HttpServletRequest req) {
         tentativas.limitarOrigem("recuperacao-ip:" + req.getRemoteAddr(), 15);
-        // A emissão depende do canal verificado e do provedor de entrega.
+        entrega.solicitarRecuperacao(pedido.email());
     }
 
     @PostMapping("/recuperacao/confirmacao")

@@ -1,9 +1,9 @@
 name: FairGo Driver Flutter
 on:
   push:
-    paths: ['apps/driver/**', '.github/workflows/driver-flutter.yml']
+    paths: ['apps/driver/**', 'backend/src/main/java/br/fairgo/ContaDriver.java', 'backend/src/main/java/br/fairgo/ContatoDriver.java', '.github/workflows/driver-flutter.yml']
   pull_request:
-    paths: ['apps/driver/**', '.github/workflows/driver-flutter.yml']
+    paths: ['apps/driver/**', 'backend/src/main/java/br/fairgo/ContaDriver.java', 'backend/src/main/java/br/fairgo/ContatoDriver.java', '.github/workflows/driver-flutter.yml']
   workflow_dispatch:
 permissions:
   contents: read

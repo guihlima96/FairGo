@@ -51,6 +51,22 @@ class RecuperacaoDriver {
         });
     }
 
+    Optional<Entrega> emitirParaEmail(String email, Duration prazo) {
+        return tx.execute(status -> {
+            var titulares = db.queryForList("""
+                    SELECT u.id FROM usuarios u JOIN contas_driver c ON c.usuario_id=u.id
+                    WHERE u.email=? AND c.email_verificado AND u.perfil='MOTORISTA' FOR UPDATE OF u,c
+                    """, UUID.class, email);
+            if (titulares.isEmpty()) return Optional.empty();
+            UUID titular = titulares.get(0);
+            boolean vigente = Boolean.TRUE.equals(db.queryForObject("""
+                    SELECT EXISTS (SELECT 1 FROM recuperacoes_driver
+                    WHERE usuario_id=? AND expira_em>clock_timestamp())
+                    """, Boolean.class, titular));
+            return vigente ? Optional.empty() : emitir(titular, prazo);
+        });
+    }
+
     boolean redefinir(String token, String novaSenha) {
         String digest = TokenOpaco.hash(token);
         return Boolean.TRUE.equals(tx.execute(status -> {

@@ -141,3 +141,7 @@ Com um token Admin válido, **Atualizar fila** consulta `GET /api/admin/validaca
 O painel consulta uma única projeção PostgreSQL e conta seus itens por grupo. Com a página visível, atualiza a fila a cada 15 segundos e imediatamente após uma decisão no painel. Uma atualização da fila preserva a análise em andamento e as revisões abertas pelo administrador.
 
 Cadastros pendentes ficam em incompletos ou prontos para análise. Os já decididos aparecem conforme a situação registrada. A prontidão considera presença dos quatro documentos obrigatórios do motorista ou, no veículo, CRLV e dados técnicos. Autenticidade, elegibilidade, titularidade e conferência visual continuam sujeitas às verificações próprias. O toxicológico é facultativo.
+
+### E-mail transacional de homologação
+
+O backend inicia com e-mail e SMS desativados. Para habilitar o Brevo em homologação, configurar as variáveis de remetente, credencial e lista explícita de destinatários no servidor. As permissões SQL existentes atendem aos fluxos de emissão e consumo. [Configuração e roteiro de validação](../docs/homologacao-email.md)
