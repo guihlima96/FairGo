@@ -17,14 +17,18 @@ class ContatoDriver {
     }
     private final VerificacaoContato verificacao;
 
-    ContatoDriver(VerificacaoContato verificacao) {
+    record Desafio(UUID desafio) {}
+    private final EntregaDriver entrega;
+
+    ContatoDriver(VerificacaoContato verificacao, EntregaDriver entrega) {
         this.verificacao = verificacao;
+        this.entrega = entrega;
     }
 
     @PostMapping("/solicitacoes")
-    public void solicitar(@PathVariable Canal canal) {
-        // Habilitar a emissão somente após integrar a entrega ao contato da conta.
-        throw new ResponseStatusException(SERVICE_UNAVAILABLE);
+    @ResponseStatus(ACCEPTED)
+    public Desafio solicitar(@PathVariable Canal canal, Principal sessao) {
+        return new Desafio(entrega.verificar(UUID.fromString(sessao.getName()), canal));
     }
 
     @PostMapping("/confirmacao")

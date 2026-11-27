@@ -48,6 +48,26 @@ class RecuperacaoDriverTest {
         db.update("UPDATE contas_driver SET email_verificado=true WHERE usuario_id=?", titular);
     }
 
+    @Test void recuperacaoPublicaConcorrenteEmiteUmaVezParaDestinoVerificado() throws Exception {
+        assertTrue(servico.emitirParaEmail(email, PRAZO_TESTE).isEmpty());
+        verificar();
+        var barreira = new CyclicBarrier(2);
+        Callable<Optional<RecuperacaoDriver.Entrega>> chamada = () -> {
+            barreira.await(10,TimeUnit.SECONDS);
+            return servico.emitirParaEmail(email, PRAZO_TESTE);
+        };
+        var pool = Executors.newFixedThreadPool(2);
+        try {
+            var primeira = pool.submit(chamada);
+            var segunda = pool.submit(chamada);
+            var entregas = java.util.stream.Stream.of(primeira.get(15, TimeUnit.SECONDS),
+                    segunda.get(15, TimeUnit.SECONDS)).flatMap(Optional::stream).toList();
+            assertEquals(1, entregas.size());
+            assertEquals(email, entregas.get(0).destino());
+            assertTrue(servico.redefinir(entregas.get(0).token(), "Senha ficticia de teste"));
+        } finally { pool.shutdownNow(); }
+    }
+
     @Test void destinoSubstituicaoEExpiracao() {
         assertTrue(servico.emitir(titular,PRAZO_TESTE).isEmpty());
         verificar();

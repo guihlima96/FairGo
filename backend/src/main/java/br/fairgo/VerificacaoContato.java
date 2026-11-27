@@ -43,8 +43,13 @@ class VerificacaoContato {
 
     // Uso interno pelo futuro adaptador de entrega. O segredo nunca integra a resposta HTTP.
     Emissao emitir(UUID titular, Canal canal) {
+        return emitir(titular, canal, destino -> true);
+    }
+
+    Emissao emitir(UUID titular, Canal canal, java.util.function.Predicate<String> permitido) {
         return tx.execute(status -> {
             Contato contato = bloquear(titular, canal);
+            if (!permitido.test(contato.destino())) throw new ResponseStatusException(SERVICE_UNAVAILABLE);
             if (contato.verificado()) throw new ResponseStatusException(CONFLICT);
             UUID desafio = UUID.randomUUID();
             String codigo = provaCodigo.gerarCodigo();

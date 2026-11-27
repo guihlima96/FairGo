@@ -146,3 +146,7 @@ Continuam abertas **OS-01** (cotas, abuso e isolamento operacional do conversor)
 ### Aplicativo FairGo Driver
 
 O cliente Android reside em `apps/driver`. A entrada apresenta a marca e as rotas Entrar e Criar conta. Em `lib/core` ficam o tema, as rotas e a configuração do prefixo REST `/api/driver/`. As telas ficam em `features` e o símbolo visual em `shared`. A navegação funciona offline. A área Entrar usa DriverApi (dart:io) para criar sessão, consultar /me e revogar a sessão. Um canal Flutter guarda a credencial cifrada com AES-GCM, chave do Android Keystore e arquivo privado fora do backup. A origem da API acompanha o token para impedir seu uso em outro ambiente. A identificação do titular vem exclusivamente do servidor. O backend compartilhado continua responsável pelas regras e pela autorização. [Execução e teste por USB](../apps/driver/README.md)
+
+## INT-001.1 — infraestrutura de notificações
+
+O pacote br.fairgo.notificacoes define contratos independentes de e-mail e SMS. A configuração seleciona Brevo ou desativa o e-mail. A política de homologação exige lista explícita de destinos. EntregaDriver conecta os contratos às emissões transacionais existentes e chama o adaptador após o commit. O código e o token são gerados no backend. [Operação, limites e falhas](homologacao-email.md)
