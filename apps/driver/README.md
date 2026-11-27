@@ -1,6 +1,6 @@
 # FairGo Driver
 
-Cliente Android do motorista. A tela inicial, o tema e a navegação funcionam offline. Entrar e Criar conta abrem telas informativas. Esta entrega não coleta credenciais nem efetua requisições.
+Cliente Android do motorista. A tela inicial, o tema e a navegação funcionam offline. Entrar autentica a conta Driver. Criar conta mantém a navegação informativa.
 
 ## VS Code e Android físico
 
@@ -31,7 +31,7 @@ No VS Code, a configuração pessoal de execução pode incluir `"toolArgs": ["-
 
 `FAIRGO_API_ORIGIN` aceita uma origem HTTPS sem caminho, credenciais ou parâmetros. A configuração constrói exclusivamente o prefixo `/api/driver/`. A origem pode ficar ausente para usar a navegação offline. O HTTP local é aceito apenas em debug para `127.0.0.1:8080`. A política Android de debug permite cleartext apenas para esse host. O manifesto principal desabilita cleartext.
 
-Quando houver integração, iniciar o backend no computador conforme o [guia do servidor](../../backend/README.md), mantendo o bind em 127.0.0.1. O ADB encaminha a porta HTTP do servidor inteiro por USB. A autorização das rotas administrativas continua no servidor e o app conhece apenas recursos Driver. Não encaminhar a porta do PostgreSQL. Nunca incluir tokens, chaves ou dados pessoais em `--dart-define`.
+Iniciar o backend no computador conforme o [guia do servidor](../../backend/README.md), mantendo o bind em 127.0.0.1. O ADB encaminha a porta HTTP do servidor inteiro por USB. A autorização das rotas administrativas continua no servidor e o app conhece apenas recursos Driver. Não encaminhar a porta do PostgreSQL. Nunca incluir tokens, chaves ou dados pessoais em `--dart-define`.
 
 ## Validação
 
@@ -44,4 +44,4 @@ flutter build apk --debug --no-pub --target-platform android-arm64 --dart-define
 
 O workflow Flutter testa as configurações de origem, a tela inicial, as duas rotas e o retorno. Compila o APK e verifica no pacote a biblioteca ARM64 e a API mínima 29. O workflow existente mantém a regressão do backend e painel.
 
-**Roteiro no Galaxy S10e (Android 10).** Instalar o build desta branch com `flutter run`, conferir o título, as cores, a legibilidade e as ações em retrato e paisagem. Abrir as duas opções e voltar pelo app e pelo botão do sistema. Repetir sem backend e conferir o túnel com `adb reverse --list`. A comunicação HTTP ponta a ponta ficará para a integração de uma operação real do Driver.
+**Roteiro no Galaxy S10e (Android 10).** Instalar o build desta branch com `flutter run`, conferir o título, as cores, a legibilidade e as ações em retrato e paisagem. Abrir as duas opções e voltar pelo app e pelo botão do sistema. Repetir sem backend e conferir o túnel com `adb reverse --list`. Com uma conta fictícia no banco de homologação, testar login por e-mail e por UUID, senha incorreta, botão de visibilidade, reabertura da área pelo botão Entrar e logout. Desconectar o USB durante uma tentativa e verificar a mensagem. Reconectar antes de validar a revogação no servidor. Manter o aparelho sem emulador.

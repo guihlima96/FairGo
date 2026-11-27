@@ -22,3 +22,7 @@ A renovação depende de aprovação de prazos absoluto e de inatividade, rotaç
 | E-mail | Resend e Brevo | Amazon SES |
 
 A seleção do fornecedor por canal e as condições comerciais serão avaliadas durante a preparação dos testes reais. Até essa etapa, os testes automatizados usam dados fictícios, sem credenciais de fornecedores, pagamentos ou envios reais. A escolha de um fornecedor de SMS não autoriza recuperação de acesso por SMS. [Arquitetura de entrega substituível](../arquitetura.md#entrega-de-sms-e-e-mail)
+
+### Homologação do login Android — PR #25
+
+Validar no Galaxy S10e a persistência após encerramento do processo, a expiração, a revogação e a perda do túnel USB. Renovação e recuperação por canais externos continuam pendentes em DA-03.

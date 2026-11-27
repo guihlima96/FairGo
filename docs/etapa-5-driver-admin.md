@@ -192,3 +192,7 @@ Em uma rede compartilhada, tentativas contra um motorista não consomem a cota p
 ## Cliente Flutter inicial — PR #24
 
 A abertura do FairGo Driver oferece Entrar e Criar conta. As duas rotas apresentam o estado de implementação e permitem voltar. O primeiro build Android para desenvolvimento usa ARM64 e API mínima 29. O contrato REST Driver permanece no backend. [Guia de execução e validação física](../apps/driver/README.md)
+
+## Login Flutter — PR #25
+
+Ao abrir Entrar, o app valida a sessão armazenada consultando o perfil. O prazo absoluto vem de expiraEm. O cliente descarta a sessão vencida ou recusada e exige novo login. Sair apaga a credencial local e solicita revogação da sessão apresentada. Uma falha de rede no logout pode deixar a sessão remota válida até a expiração. A área autenticada exibe apenas o nome.
