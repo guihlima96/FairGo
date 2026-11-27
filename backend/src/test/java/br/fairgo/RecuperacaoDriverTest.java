@@ -48,6 +48,26 @@ class RecuperacaoDriverTest {
         db.update("UPDATE contas_driver SET email_verificado=true WHERE usuario_id=?", titular);
     }
 
+    @Test void entregaAssincronaPermiteRecuperarComTokenDoEmail() throws Exception {
+        verificar();
+        var caixa = new ArrayBlockingQueue<br.fairgo.notificacoes.Mensagem>(1);
+        var emailTeste = new br.fairgo.notificacoes.EmailHomologacao(m -> {
+            caixa.add(m);
+            return br.fairgo.notificacoes.Resultado.ACEITO;
+        }, Set.of(email));
+        var fluxo = new EntregaDriver(null, servico, emailTeste, 600);
+        try {
+            fluxo.solicitarRecuperacao(email);
+            var mensagem = caixa.poll(5, TimeUnit.SECONDS);
+            assertNotNull(mensagem);
+            assertEquals(email, mensagem.destino());
+            var token = java.util.regex.Pattern.compile("rec_[0-9a-f]{64}").matcher(mensagem.texto());
+            assertTrue(token.find());
+            assertTrue(servico.redefinir(token.group(), "Senha de teste ficticia"));
+            assertFalse(servico.redefinir(token.group(), "Senha de teste ficticia"));
+        } finally { fluxo.encerrar(); }
+    }
+
     @Test void recuperacaoPublicaConcorrenteEmiteUmaVezParaDestinoVerificado() throws Exception {
         assertTrue(servico.emitirParaEmail(email, PRAZO_TESTE).isEmpty());
         verificar();
