@@ -8,11 +8,13 @@ void main() {
   ) async {
     await tester.pumpWidget(const FairGoDriverApp());
     expect(find.text('FairGo Driver'), findsOneWidget);
+    final theme = Theme.of(tester.element(find.byType(Scaffold)));
+    expect(theme.brightness, Brightness.dark);
     for (final label in ['Entrar', 'Criar conta']) {
       await tester.tap(find.text(label));
       await tester.pumpAndSettle();
       expect(find.widgetWithText(AppBar, label), findsOneWidget);
-      expect(find.textContaining('pr�xima etapa'), findsOneWidget);
+      expect(find.textContaining('próxima etapa'), findsOneWidget);
       await tester.tap(find.byTooltip('Voltar'));
       await tester.pumpAndSettle();
       expect(find.text('FairGo Driver'), findsOneWidget);

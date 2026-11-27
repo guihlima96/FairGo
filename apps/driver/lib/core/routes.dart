@@ -12,12 +12,12 @@ abstract final class DriverRoutes {
     home: (_) => const WelcomePage(),
     login: (_) => const AccessPage(
       title: 'Entrar',
-      message: 'O acesso � conta estar� dispon�vel em uma pr�xima etapa.',
+      message: 'O acesso à conta estará disponível em uma próxima etapa.',
     ),
     signup: (_) => const AccessPage(
       title: 'Criar conta',
       message:
-          'O cadastro de motoristas estar� dispon�vel em uma pr�xima etapa.',
+          'O cadastro de motoristas estará disponível em uma próxima etapa.',
     ),
   };
 }

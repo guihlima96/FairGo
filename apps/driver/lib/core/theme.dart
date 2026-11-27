@@ -1,30 +1,34 @@
 import 'package:material_ui/material_ui.dart';
 
 const navy = Color(0xff14233e);
+const background = Color(0xff101a2c);
 const electricBlue = Color(0xff1854df);
 
 final driverTheme = ThemeData(
   useMaterial3: true,
-  scaffoldBackgroundColor: Colors.white,
-  colorScheme: ColorScheme.fromSeed(seedColor: electricBlue).copyWith(
+  scaffoldBackgroundColor: background,
+  colorScheme: ColorScheme.fromSeed(
+    seedColor: electricBlue,
+    brightness: Brightness.dark,
+  ).copyWith(
     primary: electricBlue,
     onPrimary: Colors.white,
-    surface: Colors.white,
-    onSurface: navy,
+    surface: background,
+    onSurface: Colors.white,
   ),
   fontFamily: 'Roboto',
   textTheme: const TextTheme(
     displaySmall: TextStyle(
-      color: navy,
+      color: Colors.white,
       fontSize: 40,
       fontWeight: FontWeight.w700,
       letterSpacing: -1.6,
     ),
-    titleLarge: TextStyle(color: navy, fontWeight: FontWeight.w600),
+    titleLarge: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
   ),
   appBarTheme: const AppBarTheme(
-    backgroundColor: Colors.white,
-    foregroundColor: navy,
+    backgroundColor: background,
+    foregroundColor: Colors.white,
   ),
   filledButtonTheme: FilledButtonThemeData(
     style: FilledButton.styleFrom(
@@ -36,7 +40,7 @@ final driverTheme = ThemeData(
   outlinedButtonTheme: OutlinedButtonThemeData(
     style: OutlinedButton.styleFrom(
       minimumSize: const Size.fromHeight(54),
-      foregroundColor: navy,
+      foregroundColor: Colors.white,
       side: const BorderSide(color: Color(0xffb9c6da)),
       textStyle: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),

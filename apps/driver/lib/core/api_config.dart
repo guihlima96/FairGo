@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 
-/// Origem do backend. O cat�logo de recursos deste cliente � exclusivo do Driver.
+/// Origem do backend. O catálogo de recursos deste cliente é exclusivo do Driver.
 class DriverApiConfig {
   const DriverApiConfig._(this.base);
   final Uri? base;
