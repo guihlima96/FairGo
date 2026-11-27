@@ -1,4 +1,5 @@
 import 'package:fairgo_driver/main.dart';
+import 'package:fairgo_driver/core/session_store.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -6,6 +7,15 @@ void main() {
   testWidgets('mostra FairGo Driver e permite abrir e voltar das duas rotas', (
     tester,
   ) async {
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(
+      SessionStore.channel,
+      (call) async => null,
+    );
+    addTearDown(
+      () => messenger.setMockMethodCallHandler(SessionStore.channel, null),
+    );
     await tester.pumpWidget(const FairGoDriverApp());
     expect(find.text('FairGo Driver'), findsOneWidget);
     final theme = Theme.of(tester.element(find.byType(Scaffold)));
