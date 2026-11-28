@@ -41,7 +41,7 @@ class DriverApi {
   }) async {
     final base = config.base;
     if (base == null) {
-      throw const DriverFailure('Configure a conexÃ£o com o FairGo.');
+      throw const DriverFailure('Configure a conexão com o FairGo.');
     }
     final client = HttpClient();
     Future<Map<String, dynamic>> send() async {
@@ -89,7 +89,7 @@ class DriverApi {
             throw const DriverFailure('Revise os dados informados.', 400);
           case 409:
             throw const DriverFailure(
-              'HÃ¡ um conflito com um cadastro existente.',
+              'Há um conflito com um cadastro existente.',
               409,
             );
           case 429:
@@ -108,8 +108,8 @@ class DriverApi {
         case 401:
           throw DriverFailure(
             token == null
-                ? 'Identificador ou senha invÃ¡lidos.'
-                : 'SessÃ£o encerrada. Entre novamente.',
+                ? 'Identificador ou senha inválidos.'
+                : 'Sessão encerrada. Entre novamente.',
             response.statusCode,
           );
         case 429:
@@ -118,7 +118,7 @@ class DriverApi {
             429,
           );
         default:
-          throw const DriverFailure('Servidor indisponÃ­vel. Tente novamente.');
+          throw const DriverFailure('Servidor indisponível. Tente novamente.');
       }
     }
 
@@ -129,7 +129,7 @@ class DriverApi {
       throw const DriverFailure('Resposta inesperada do servidor.');
     } on IOException {
       throw const DriverFailure(
-        'Sem conexÃ£o com o servidor. Confira a rede ou o cabo USB.',
+        'Sem conexão com o servidor. Confira a rede ou o cabo USB.',
       );
     } on TimeoutException {
       throw const DriverFailure(
@@ -146,12 +146,12 @@ class DriverApi {
     } on DriverFailure catch (error) {
       if (error.status != null || config.base == null) rethrow;
     } on IOException {
-      // A conexÃ£o pode cair apÃ³s o servidor gravar a conta.
+      // A conexão pode cair após o servidor gravar a conta.
     } on FormatException {
-      // Uma resposta incompleta nÃ£o confirma a criaÃ§Ã£o.
+      // Uma resposta incompleta não confirma a criação.
     }
     throw const DriverFailure(
-      'NÃ£o foi possÃ­vel confirmar o resultado. Confira a conexÃ£o e tente entrar antes de enviar outro cadastro.',
+      'Não foi possível confirmar o resultado. Confira a conexão e tente entrar antes de enviar outro cadastro.',
     );
   }
 
