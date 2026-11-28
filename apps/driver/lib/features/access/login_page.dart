@@ -6,6 +6,7 @@ import 'package:material_ui/material_ui.dart';
 import '../../core/driver_api.dart';
 import '../../core/session_store.dart';
 import '../../shared/driver_mark.dart';
+import '../../shared/sensitive_field.dart';
 import 'email_access.dart';
 
 class LoginPage extends StatefulWidget {
@@ -19,7 +20,7 @@ class LoginPage extends StatefulWidget {
 class _LoginPageState extends State<LoginPage> with WidgetsBindingObserver {
   final id = TextEditingController();
   final password = TextEditingController();
-  bool busy = true, hidden = true;
+  bool busy = true;
   String? notice, name;
   bool verified = false;
   Grant? grant;
@@ -113,7 +114,6 @@ class _LoginPageState extends State<LoginPage> with WidgetsBindingObserver {
       final saved = await widget.api.login(id.text.trim(), password.text);
       if (!mounted) return;
       password.clear();
-      hidden = true;
       await widget.store.save(saved);
       if (mounted) await identify(saved);
     });
@@ -175,23 +175,11 @@ class _LoginPageState extends State<LoginPage> with WidgetsBindingObserver {
                   labelText: 'Número de cadastro ou e-mail',
                 ),
               ),
-              TextField(
+              SensitiveField(
+                label: 'Senha',
                 controller: password,
                 enabled: !busy,
-                obscureText: hidden,
-                autocorrect: false,
-                enableSuggestions: false,
                 onSubmitted: (_) => login(),
-                decoration: InputDecoration(
-                  labelText: 'Senha',
-                  suffixIcon: IconButton(
-                    tooltip: hidden ? 'Mostrar senha' : 'Ocultar senha',
-                    onPressed: () => setState(() => hidden = !hidden),
-                    icon: Icon(
-                      hidden ? Icons.visibility : Icons.visibility_off,
-                    ),
-                  ),
-                ),
               ),
               const SizedBox(height: 24),
               FilledButton(
