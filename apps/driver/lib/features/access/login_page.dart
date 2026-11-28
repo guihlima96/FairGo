@@ -6,6 +6,7 @@ import 'package:material_ui/material_ui.dart';
 import '../../core/driver_api.dart';
 import '../../core/session_store.dart';
 import '../../shared/driver_mark.dart';
+import 'email_access.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key, required this.api, required this.store});
@@ -20,6 +21,7 @@ class _LoginPageState extends State<LoginPage> with WidgetsBindingObserver {
   final password = TextEditingController();
   bool busy = true, hidden = true;
   String? notice, name;
+  bool verified = false;
   Grant? grant;
   Timer? timer;
 
@@ -63,12 +65,14 @@ class _LoginPageState extends State<LoginPage> with WidgetsBindingObserver {
   Future<void> identify(Grant saved) async {
     if (saved.expires.isAfter(DateTime.now())) {
       try {
-        final who = await widget.api.name(saved.token);
+        final who = await widget.api.perfil(saved.token);
         if (!mounted) return;
         final remaining = saved.expires.difference(DateTime.now());
         if (!remaining.isNegative && remaining != Duration.zero) {
           grant = saved;
-          name = who;
+          name = who.nome;
+          verified = who.verificado;
+          timer?.cancel();
           timer = Timer(remaining, expire);
           return;
         }
@@ -194,9 +198,53 @@ class _LoginPageState extends State<LoginPage> with WidgetsBindingObserver {
                 onPressed: busy ? null : login,
                 child: const Text('Entrar'),
               ),
+              TextButton(
+                onPressed: busy
+                    ? null
+                    : () async {
+                        password.clear();
+                        final reset = await Navigator.push<bool>(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => RecoveryPage(api: widget.api),
+                          ),
+                        );
+                        if (reset == true && mounted) {
+                          await run(() async {
+                            final saved = await widget.store.read();
+                            if (saved != null) {
+                              try {
+                                await widget.api.perfil(saved.token);
+                              } on DriverFailure {
+                                await forget();
+                              }
+                            }
+                            notice =
+                                'Senha redefinida. Entre com a nova senha.';
+                          });
+                        }
+                      },
+                child: const Text('Esqueci minha senha'),
+              ),
             ] else ...[
               Text(name!, style: Theme.of(context).textTheme.titleLarge),
               const SizedBox(height: 24),
+              if (verified)
+                const Text('E-mail verificado')
+              else
+                VerificationPanel(
+                  api: widget.api,
+                  token: grant!.token,
+                  refresh: () async {
+                    final saved = grant;
+                    if (saved == null) return;
+                    final current = await widget.api.perfil(saved.token);
+                    if (mounted && grant == saved) {
+                      setState(() => verified = current.verificado);
+                    }
+                  },
+                  expired: () => run(forget),
+                ),
               OutlinedButton(
                 onPressed: busy ? null : logout,
                 child: const Text('Sair'),

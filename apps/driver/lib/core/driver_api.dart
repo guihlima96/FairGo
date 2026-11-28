@@ -34,6 +34,8 @@ class DriverApi {
   Future<Map<String, dynamic>> _request(
     String method,
     String path, {
+    int? expected,
+    bool readJson = false,
     String? token,
     Map<String, String>? body,
   }) async {
@@ -53,6 +55,23 @@ class DriverApi {
         request.add(utf8.encode(jsonEncode(body)));
       }
       final response = await request.close();
+      if (expected != null) {
+        if (response.statusCode == expected) {
+          if (!readJson) return {};
+          final value = jsonDecode(await utf8.decoder.bind(response).join());
+          if (value is Map<String, dynamic>) return value;
+          throw const FormatException();
+        }
+        final status = response.statusCode;
+        throw DriverFailure(switch (status) {
+          400 => 'Dados inválidos, vencidos ou já utilizados.',
+          401 => 'Sessão encerrada. Entre novamente.',
+          409 => 'E-mail já verificado.',
+          429 => 'Limite atingido. Aguarde antes de tentar novamente.',
+          503 => 'Serviço de verificação indisponível.',
+          _ => 'Não foi possível confirmar o resultado.',
+        }, status);
+      }
       if (path == 'contas') {
         switch (response.statusCode) {
           case 201:
@@ -105,7 +124,10 @@ class DriverApi {
 
     try {
       return await send().timeout(timeout);
-    } on SocketException {
+    } on FormatException {
+      if (expected == null) rethrow;
+      throw const DriverFailure('Resposta inesperada do servidor.');
+    } on IOException {
       throw const DriverFailure(
         'Sem conexão com o servidor. Confira a rede ou o cabo USB.',
       );
@@ -140,6 +162,73 @@ class DriverApi {
       body: {'identificador': id, 'senha': password},
     ),
   );
+  Future<({String nome, bool verificado})> perfil(String token) async {
+    final data = await _request(
+      'GET',
+      'me',
+      token: token,
+      expected: 200,
+      readJson: true,
+    );
+    if (data['nome'] is! String || data['emailVerificado'] is! bool) {
+      throw const DriverFailure('Perfil indisponível.');
+    }
+    return (
+      nome: data['nome'] as String,
+      verificado: data['emailVerificado'] as bool,
+    );
+  }
+
+  static const verificacoes = 'me/verificacoes/EMAIL';
+  Future<String> solicitarCodigo(String token) async {
+    final data = await _request(
+      'POST',
+      '$verificacoes/solicitacoes',
+      token: token,
+      expected: 202,
+      readJson: true,
+    );
+    final id = data['desafio'];
+    if (id is! String ||
+        !RegExp(r'^[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}$')
+            .hasMatch(id)) {
+      throw const DriverFailure('Desafio não confirmado.');
+    }
+    return id;
+  }
+
+  Future<void> confirmarCodigo(
+    String token,
+    String desafio,
+    String codigo,
+  ) async {
+    await _request(
+      'POST',
+      '$verificacoes/confirmacao',
+      token: token,
+      expected: 204,
+      body: {'desafio': desafio, 'codigo': codigo},
+    );
+  }
+
+  Future<void> recuperar(String email) async {
+    await _request(
+      'POST',
+      'recuperacao',
+      expected: 202,
+      body: {'email': email},
+    );
+  }
+
+  Future<void> redefinir(String token, String senha) async {
+    await _request(
+      'POST',
+      'recuperacao/confirmacao',
+      expected: 204,
+      body: {'token': token, 'novaSenha': senha},
+    );
+  }
+
   Future<String> name(String token) async =>
       (await _request('GET', 'me', token: token))['nome'] as String;
   Future<void> logout(String token) async {
