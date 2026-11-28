@@ -27,7 +27,8 @@ class Grant {
 }
 
 class DriverApi {
-  DriverApi(this.config);
+  DriverApi(this.config, {this.timeout = const Duration(seconds: 20)});
+  final Duration timeout;
   final DriverApiConfig config;
 
   Future<Map<String, dynamic>> _request(
@@ -52,6 +53,32 @@ class DriverApi {
         request.add(utf8.encode(jsonEncode(body)));
       }
       final response = await request.close();
+      if (path == 'contas') {
+        switch (response.statusCode) {
+          case 201:
+            final data = jsonDecode(await utf8.decoder.bind(response).join());
+            if (data is Map<String, dynamic> &&
+                data['situacao'] == 'PENDENTE' &&
+                data['id'] is String &&
+                RegExp(
+                  r'^[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}$',
+                ).hasMatch(data['id'] as String)) {
+              return data;
+            }
+            throw const FormatException();
+          case 400:
+            throw const DriverFailure('Revise os dados informados.', 400);
+          case 409:
+            throw const DriverFailure(
+              'Há um conflito com um cadastro existente.',
+              409,
+            );
+          case 429:
+            break;
+          default:
+            throw const FormatException();
+        }
+      }
       switch (response.statusCode) {
         case 204:
           return {};
@@ -77,7 +104,7 @@ class DriverApi {
     }
 
     try {
-      return await send().timeout(const Duration(seconds: 20));
+      return await send().timeout(timeout);
     } on SocketException {
       throw const DriverFailure(
         'Sem conexão com o servidor. Confira a rede ou o cabo USB.',
@@ -89,6 +116,21 @@ class DriverApi {
     } finally {
       client.close(force: true);
     }
+  }
+
+  Future<String> cadastrar(Map<String, String> dados) async {
+    try {
+      return (await _request('POST', 'contas', body: dados))['id'] as String;
+    } on DriverFailure catch (error) {
+      if (error.status != null || config.base == null) rethrow;
+    } on IOException {
+      // A conexão pode cair após o servidor gravar a conta.
+    } on FormatException {
+      // Uma resposta incompleta não confirma a criação.
+    }
+    throw const DriverFailure(
+      'Não foi possível confirmar o resultado. Confira a conexão e tente entrar antes de enviar outro cadastro.',
+    );
   }
 
   Future<Grant> login(String id, String password) async => Grant.fromJson(

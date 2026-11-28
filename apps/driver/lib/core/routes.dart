@@ -5,7 +5,7 @@ import 'driver_api.dart';
 import 'session_store.dart';
 import '../features/access/login_page.dart';
 
-import '../features/access/access_page.dart';
+import '../features/access/signup_page.dart';
 import '../features/welcome/welcome_page.dart';
 
 abstract final class DriverRoutes {
@@ -22,10 +22,7 @@ abstract final class DriverRoutes {
         store: SessionStore(config.base?.toString() ?? ''),
       );
     },
-    signup: (_) => const AccessPage(
-      title: 'Criar conta',
-      message:
-          'O cadastro de motoristas estará disponível em uma próxima etapa.',
-    ),
+    signup: (_) =>
+        SignupPage(api: DriverApi(DriverApiConfig.fromEnvironment())),
   };
 }
