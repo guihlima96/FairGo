@@ -32,3 +32,7 @@ Validar no Galaxy S10e a persistência após encerramento do processo, a expira�
 DA-02 e DA-03 recebem entrega Brevo somente para endereços de homologação explicitamente autorizados. Confirmar o fluxo completo, limites e expiração com a caixa real antes de ampliar a exposição. Registrar saturação da fila, incerteza de entrega e conectividade IPv6. [Roteiro de homologação](../homologacao-email.md)
 
 **INT-001.2 — pendente.** A contratação, homologação e integração real de SMS foram adiadas. Manter o celular sujeito à confirmação e as regras cadastrais vigentes.
+
+## Cadastro Flutter — PR #28
+
+Fluxo disponível para desenvolvimento e homologação interna. Validar no Galaxy S10e; lançamento público depende das pendências regulatórias e operacionais. Nome e contatos começam sem confirmação. SMS continua em INT-001.2. Documentos e análise administrativa permanecem etapas posteriores.

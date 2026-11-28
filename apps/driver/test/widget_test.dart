@@ -27,7 +27,7 @@ void main() {
       if (label == 'Entrar') {
         expect(find.byType(TextField), findsNWidgets(2));
       } else {
-        expect(find.textContaining('próxima etapa'), findsOneWidget);
+        expect(find.text('Celular com DDD'), findsOneWidget);
       }
       await tester.tap(find.byTooltip('Voltar'));
       await tester.pumpAndSettle();

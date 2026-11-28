@@ -1,6 +1,6 @@
 # FairGo Driver
 
-Cliente Android do motorista. A tela inicial, o tema e a navegação funcionam offline. Entrar autentica a conta Driver. Criar conta mantém a navegação informativa.
+Cliente Android do motorista. A tela inicial, o tema e a navegação funcionam offline. Entrar autentica a conta Driver. Criar conta abre o cadastro inicial em quatro etapas.
 
 ## VS Code e Android físico
 
@@ -45,3 +45,7 @@ flutter build apk --debug --no-pub --target-platform android-arm64 --dart-define
 O workflow Flutter testa as configurações de origem, a tela inicial, as duas rotas e o retorno. Compila o APK e verifica no pacote a biblioteca ARM64 e a API mínima 29. O workflow existente mantém a regressão do backend e painel.
 
 **Roteiro no Galaxy S10e (Android 10).** Instalar o build desta branch com `flutter run`, conferir o título, as cores, a legibilidade e as ações em retrato e paisagem. Abrir as duas opções e voltar pelo app e pelo botão do sistema. Repetir sem backend e conferir o túnel com `adb reverse --list`. Com uma conta fictícia no banco de homologação, testar login por e-mail e por UUID, senha incorreta, botão de visibilidade, reabertura da área pelo botão Entrar e logout. Desconectar o USB durante uma tentativa e verificar a mensagem. Reconectar antes de validar a revogação no servidor. Manter o aparelho sem emulador.
+
+## Homologação interna do cadastro no Galaxy S10e
+
+Com o backend de homologação em loopback, configure o túnel e execute o app com os comandos USB acima. Toque em Criar conta. Use celular, CPF válido de teste, nome, e-mail e senha fictícios em base isolada. Volte uma etapa e confira os dados. Após confirmar a senha, toque uma vez em Criar minha conta. Confira o número retornado, siga para o login e autentique pelo número. Repita os dados para conferir o conflito genérico. Em uma nova tentativa, interrompa o túnel e confira a mensagem de resultado incerto. Verifique a conta antes de repetir.

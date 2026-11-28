@@ -27,6 +27,56 @@ void main() {
     await server.close(force: true);
   });
 
+  for (final status in [201, 400, 409, 429, 200]) {
+    test('cadastro HTTP $status', () async {
+      server.listen((req) async {
+        expect(req.method, 'POST');
+        expect(req.uri.path, '/api/driver/contas');
+        await req.drain<void>();
+        req.response.statusCode = status;
+        req.response.write(
+          '{"id":"aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee","situacao":"PENDENTE"}',
+        );
+        await req.response.close();
+      });
+      final result = api.cadastrar({'nome': 'Teste'});
+      if (status == 201) {
+        expect(await result, 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee');
+      } else {
+        await expectLater(
+          result,
+          throwsA(
+            isA<DriverFailure>().having(
+              (e) => e.status,
+              'status',
+              status == 200 ? null : status,
+            ),
+          ),
+        );
+      }
+    });
+  }
+  test('timeout ou desconexão mantém o resultado incerto', () async {
+    var calls = 0;
+    server.listen((req) {
+      calls++;
+    });
+    final short = DriverApi(
+      api.config,
+      timeout: const Duration(milliseconds: 200),
+    );
+    final unknown = throwsA(
+      isA<DriverFailure>().having(
+        (e) => e.message,
+        'mensagem',
+        contains('confirmar o resultado'),
+      ),
+    );
+    await expectLater(short.cadastrar({}), unknown);
+    expect(calls, 1);
+    await server.close(force: true);
+    await expectLater(short.cadastrar({}), unknown);
+  });
   test('contrato HTTP do login, perfil e logout', () async {
     final requests = <String>[];
     server.listen((request) async {
