@@ -121,6 +121,31 @@ class Driver(unittest.TestCase):
         sql(f"UPDATE contas_driver SET senha_hash='{(salt + digest).hex()}' WHERE usuario_id='{titular}'")
         self.login(titular, legada)
 
+    def test_email_de_cadastro_admin_e_driver(self):
+        admin = secrets.token_hex(32)
+        digest = hashlib.sha256(admin.encode()).hexdigest()
+        sql(f"INSERT INTO credenciais_admin VALUES ('{digest}','teste-email',now()+interval '1 hour',false)")
+        admin_url = "/api/admin/usuarios"
+        driver_url = "/api/driver/contas"
+        for rota, token in ((admin_url, admin), (driver_url, None)):
+            dados = cadastro()
+            email = dados["email"]
+            corpo = ({"nome": dados["nome"], "perfil": "PASSAGEIRO"} if token else dados)
+            for valor in (" " + email + " ", "invalido"):
+                self.assertEqual(api("POST", rota, dict(corpo, email=valor), token)[0], 400)
+            status, resultado = api("POST", rota, dict(corpo, email=email.upper()), token)
+            self.assertEqual(status, 201)
+            self.assertEqual(resultado["situacao"], "PENDENTE")
+            titular = resultado["id"]
+            self.assertEqual(sql(f"SELECT email FROM usuarios WHERE id='{titular}'"), email)
+            self.assertEqual(api("POST", admin_url, {"nome": "Teste", "perfil": "PASSAGEIRO",
+                                                      "email": email}, admin)[0], 409)
+            self.assertEqual(api("POST", driver_url, dict(cadastro(), email=email))[0], 409)
+        tentativa = dict(cadastro(), cpf=dados["cpf"])
+        self.assertEqual(api("POST", driver_url, tentativa)[0], 409)
+        novo_email = tentativa["email"]
+        self.assertEqual(sql(f"SELECT count(*) FROM usuarios WHERE email='{novo_email}'"), "0")
+
     def test_contas(self):
         a, b = cadastro(), cadastro()
         for campo, invalido in (("cpf", "00000000000"), ("celular", "123"), ("senha", "curta"), ("nome", "")):
