@@ -49,11 +49,28 @@ void main() {
     );
   });
 
-  test('nova senha aceita os limites e preserva os espaços', () {
-    expect(validNewDriverPassword('a' * 7), isFalse);
-    expect(validNewDriverPassword(' teste1 '), isTrue);
-    expect(validNewDriverPassword('a' * 32), isTrue);
-    expect(validNewDriverPassword('a' * 33), isFalse);
-    expect(validNewDriverPassword(' ' * 8), isFalse);
+  test('nova senha preserva limites e rejeita espaços Unicode', () {
+    for (final n in [8, 32]) {
+      expect(newDriverPasswordError('a' * n), isNull);
+    }
+    for (final n in [7, 33]) {
+      expect(newDriverPasswordError('a' * n), driverPasswordHint);
+    }
+    for (final s in [
+      ' abcdefg',
+      'abc defg',
+      'abcdefg ',
+      ' ' * 8,
+      'abc\tdefg',
+      'abc\ndefg',
+      'abc\u0085defg',
+      'abc\u00a0defg',
+      'abc\u2009defg',
+      'abc\u2028defg',
+      'abc\u3000defg',
+      'abc\ufeffdefg',
+    ]) {
+      expect(newDriverPasswordError(s), driverPasswordWhitespaceError);
+    }
   });
 }

@@ -177,8 +177,9 @@ class _RecoveryState extends State<RecoveryPage> {
           notice = 'Confira o token recebido por e-mail.';
           return;
         }
-        if (!validNewDriverPassword(password.text)) {
-          notice = driverPasswordHint;
+        final passwordError = newDriverPasswordError(password.text);
+        if (passwordError != null) {
+          notice = passwordError;
           return;
         }
         if (password.text != confirmation.text) {
@@ -272,7 +273,7 @@ class _RecoveryState extends State<RecoveryPage> {
                 controller: password,
                 enabled: !busy,
                 border: const OutlineInputBorder(),
-                helperText: '8 a 32 caracteres',
+                helperText: driverPasswordHint,
               ),
               SensitiveField(
                 label: 'Repetir a senha',
