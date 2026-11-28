@@ -150,3 +150,17 @@ O cliente Android reside em `apps/driver`. A entrada apresenta a marca e as rota
 ## INT-001.1 — infraestrutura de notificações
 
 O pacote br.fairgo.notificacoes define contratos independentes de e-mail e SMS. A configuração seleciona Brevo ou desativa o e-mail. A política de homologação exige lista explícita de destinos. EntregaDriver conecta os contratos às emissões transacionais existentes e chama o adaptador após o commit. O código e o token são gerados no backend. [Operação, limites e falhas](homologacao-email.md)
+
+## Atualização após a PR #31 e ARQ-803.2
+
+Na base 12b292c, o Driver Android cobre cadastro, sessão protegida, verificação de e-mail e recuperação. O painel Admin compartilha a persistência de usuários. Passenger possui representação cadastral, e seu aplicativo continua planejado.
+
+| Componente | Contrato e limite de reutilização |
+|---|---|
+| EmailCadastro.normalizar | Recebe a String de e-mail já validada no cadastro e devolve strip() seguido de toLowerCase(Locale.ROOT). Usa apenas Java. CadastroAdmin e ContaDriver continuam responsáveis por validação HTTP, persistência e conflito. A extração não reescreve registros existentes. |
+| documentos | FormatoDocumento, JpegSeguro, PdfSeguro e CifraDocumental processam conteúdo. Cofre mantém a política por tipo e o contexto autenticado do FAIRGO. |
+| seguranca | ProvaCodigo gera e confere a prova. VerificacaoContato mantém titular, limites e consumo transacional. |
+| notificacoes | Mensagem, Resultado e contratos de canal são reaproveitáveis. ConfiguracaoNotificacoes compõe infraestrutura, BrevoEmailAdapter traduz o envio e EntregaDriver coordena o uso na homologação. |
+| Flutter | SensitiveField atende cadastro, login e recuperação. Máscara, tema e armazenamento protegido são candidatos a reuso com segundo consumidor. DriverApi, rotas, regras de senha e DTOs seguem específicos do Driver. |
+
+O [estudo de identidade](identidade-conceitual.md) orienta decisões futuras. Os testes de arquitetura, a separação do login (ARQ-803.3) e o estudo de migrações versionadas com Flyway são entregas independentes que aguardam autorização específica.

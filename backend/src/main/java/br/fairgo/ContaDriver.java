@@ -62,7 +62,7 @@ class ContaDriver {
         if (!cpf.matches("[0-9]{11}")) throw new ResponseStatusException(BAD_REQUEST);
         String celular = dados.celular().replaceAll("[^0-9]", "");
         String telefone = celular.length() == 11 ? "+55" + celular : "+" + celular;
-        String email = dados.email().strip().toLowerCase(Locale.ROOT);
+        String email = EmailCadastro.normalizar(dados.email());
         String hash = senhas.encode(dados.senha());
         UUID id = UUID.randomUUID();
         try {

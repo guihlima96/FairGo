@@ -32,3 +32,13 @@ O [diagnóstico ARQ-803](../arquitetura.md#catálogo-e-diagnóstico-arq-803) reg
 ## Fila administrativa após a ARQ-803.0
 
 A PR #20 consolidou o diagnóstico documental. A PR #21 propõe a classificação operacional de cadastros. Permanecem em DA-02 a política de contatos e em DA-05 a verificação de autenticidade. As propostas de extração da ARQ-803 continuam independentes desta entrega.
+
+## Atualização até a PR #31 — base 12b292c
+
+As PRs #20–23 consolidaram o diagnóstico, a fila administrativa, a comunicação pública de rejeições e a prova de códigos. As PRs #24 e #25 introduziram Flutter, login e sessão protegida. A #26 integrou Brevo em homologação. A #27 documentou conformidade municipal. As PRs #28–29 entregaram autocadastro, verificação de e-mail e recuperação no app. As PRs #30–31 revisaram a máscara, a visibilidade de campos e a política de novas senhas.
+
+| Tipo de evidência | Situação |
+|---|---|
+| CI na main após #31 | [Backend/Admin](https://github.com/guihlima96/FairGo/actions/runs/46162783105) e [Flutter/Android](https://github.com/guihlima96/FairGo/actions/runs/46162783022) aprovados em 12b292c. |
+| Galaxy S10e | Responsável confirmou cadastro, login, verificação de e-mail e recuperação na #30. A confirmação física específica da política de espaços da #31 continua sem evidência neste registro. |
+| Exposição pública | SMS desativado, e-mail limitado à homologação. Permanecem revisão da política de senha e MFA, contingência para perda de contato, cotas e operação, pendências documentais OS-01–05 e DA-05, e avaliações da [frente Compliance](../compliance/README.md). |

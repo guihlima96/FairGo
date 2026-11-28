@@ -1,6 +1,5 @@
 package br.fairgo;
 
-import java.util.Locale;
 import java.util.UUID;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
@@ -34,7 +33,7 @@ class CadastroAdmin {
     ResultadoCadastro usuario(@Valid @RequestBody Usuario usuario) {
         UUID id = UUID.randomUUID();
         db.update("INSERT INTO usuarios (id, nome, email, perfil) VALUES (?, ?, ?, ?)",
-                id, usuario.nome().strip(), usuario.email().strip().toLowerCase(Locale.ROOT),
+                id, usuario.nome().strip(), EmailCadastro.normalizar(usuario.email()),
                 usuario.perfil().name());
         return new ResultadoCadastro(id, "PENDENTE");
     }
