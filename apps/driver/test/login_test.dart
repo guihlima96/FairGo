@@ -35,7 +35,8 @@ class FakeApi extends DriverApi {
   }
 
   @override
-  Future<String> name(String token) async => 'Motorista de teste';
+  Future<({String nome, bool verificado})> perfil(String token) async =>
+      (nome: 'Motorista de teste', verificado: true);
   @override
   Future<void> logout(String token) async {
     revoked = token;

@@ -27,6 +27,55 @@ void main() {
     await server.close(force: true);
   });
 
+  test('contratos de verificação e recuperação', () async {
+    const id = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
+    final paths = <String>[];
+    server.listen((req) async {
+      paths.add(req.uri.path);
+      final protected = req.uri.path.contains('verificacoes');
+      expect(
+        req.headers.value('Authorization'),
+        protected ? 'Bearer fixture' : isNull,
+      );
+      final body = await utf8.decoder.bind(req).join();
+      if (req.uri.path.endsWith('solicitacoes')) {
+        req.response.statusCode = 202;
+        req.response.write(jsonEncode({'desafio': id}));
+      } else if (req.uri.path.endsWith('recuperacao')) {
+        expect(jsonDecode(body), {'email': 'teste@example.invalid'});
+        req.response.statusCode = 202;
+      } else {
+        expect(
+          jsonDecode(body),
+          protected
+              ? {'desafio': id, 'codigo': '01234567'}
+              : {'token': 'fixture', 'novaSenha': 'senha de teste fictícia'},
+        );
+        req.response.statusCode = 204;
+      }
+      await req.response.close();
+    });
+    expect(await api.solicitarCodigo('fixture'), id);
+    await api.confirmarCodigo('fixture', id, '01234567');
+    await api.recuperar('teste@example.invalid');
+    await api.redefinir('fixture', 'senha de teste fictícia');
+    expect(paths.length, 4);
+  });
+  for (final status in [400, 401, 409, 429, 503, 200]) {
+    test('confirmação com HTTP $status preserva falha', () async {
+      var calls = 0;
+      server.listen((req) async {
+        calls++;
+        req.response.statusCode = status;
+        await req.response.close();
+      });
+      await expectLater(
+        api.confirmarCodigo('fixture', 'desafio', '12345678'),
+        throwsA(isA<DriverFailure>().having((e) => e.status, 'status', status)),
+      );
+      expect(calls, 1);
+    });
+  }
   for (final status in [201, 400, 409, 429, 200]) {
     test('cadastro HTTP $status', () async {
       server.listen((req) async {

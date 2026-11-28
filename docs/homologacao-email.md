@@ -15,3 +15,15 @@ Um HTTP 201 indica aceitação do pedido pelo fornecedor. A chegada à caixa dep
 Para recuperação, a API aplica o limite por origem e responde 202 independentemente do titular. Uma fila volátil de 16 pedidos e um trabalhador por instância isolam a latência externa. Reinício ou saturação pode descartar pedidos. O banco impede nova emissão pública enquanto houver token vigente do titular, inclusive após resultado indeterminado. FAIRGO_RECOVERY_TTL_SECONDS define a validade em homologação (padrão técnico 600, faixa 1–3600 segundos). A política pública e uma eventual fila durável permanecem em avaliação. O adaptador não mantém transação aberta durante o envio.
 
 A integração real de SMS (INT-001.2) aguarda autorização posterior.
+
+## Aplicativo no Galaxy S10e — PR #29
+
+Com a branch de homologação, seguir o roteiro USB de apps/driver/README.md. Usar conta fictícia, caixa autorizada e backend configurado pelo responsável. A homologação local do cadastro da PR #28 foi confirmada pelo responsável. Registrar separadamente os resultados desta PR:
+
+1. Recebimento do código. Entrar, conferir o estado pendente, tocar em Verificar e-mail e conferir a chegada na caixa. Testar colagem de oito dígitos e conferir o contador de reenvio.
+2. Confirmação. Submeter o código e verificar o estado atualizado no perfil. Encerrar e abrir a sessão para confirmar persistência no servidor.
+3. Recuperação. Sair, abrir Esqueci minha senha e solicitar instruções. Colar o token, confirmar a nova senha e entrar manualmente. Conferir rejeição de token reutilizado e revogação em uma segunda sessão anterior.
+
+Registrar cenário, horário e resultado, sem capturas de credenciais ou mensagens. O teste automatizado usa dados fictícios. A validação física destes três cenários segue pendente.
+
+A referência visual traz seis caixas para SMS. A área autenticada usa o símbolo e tema existentes e um campo único de oito dígitos para colagem e teclado numérico. O app usa a tipografia centralizada; a composição da marca nas telas legadas permanece distinta da arte.

@@ -36,3 +36,6 @@ DA-02 e DA-03 recebem entrega Brevo somente para endereços de homologação exp
 ## Cadastro Flutter — PR #28
 
 Fluxo disponível para desenvolvimento e homologação interna. Validar no Galaxy S10e; lançamento público depende das pendências regulatórias e operacionais. Nome e contatos começam sem confirmação. SMS continua em INT-001.2. Documentos e análise administrativa permanecem etapas posteriores.
+
+### PR #29 — homologação interna
+DA-01: cadastro Flutter homologado no S10e pelo responsável. DA-02: jornada de verificação de e-mail integrada ao perfil, com homologação física pendente. DA-03: solicitação e redefinição pelo aplicativo implementadas; validar recebimento e revogação no roteiro de homologação. Uso público depende das pendências operacionais e regulatórias. SMS segue em INT-001.2.
