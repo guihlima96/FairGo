@@ -72,3 +72,4 @@ Os pontos acima são uma lista de pendências, não propostas adotadas.
 - [Regras de tarifas](docs/regras-de-tarifas.md)
 - [Regras de cancelamento](docs/regras-de-cancelamento.md)
 - [Cadastro e segurança](docs/cadastro-e-seguranca.md)
+- [Conformidade regulatória de São José dos Campos](docs/compliance/README.md)
