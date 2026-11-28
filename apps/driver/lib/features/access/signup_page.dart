@@ -137,8 +137,9 @@ class _SignupState extends State<SignupPage> {
           return 'Confira o e-mail.';
         }
       case 3:
-        if (!validNewDriverPassword(password.text)) {
-          return driverPasswordHint;
+        final passwordError = newDriverPasswordError(password.text);
+        if (passwordError != null) {
+          return passwordError;
         }
         if (password.text != confirmation.text) {
           return 'As senhas precisam coincidir.';
@@ -271,7 +272,7 @@ class _SignupState extends State<SignupPage> {
                   label: 'Nova senha',
                   controller: password,
                   enabled: !busy,
-                  helperText: '8 a 32 caracteres',
+                  helperText: driverPasswordHint,
                 ),
                 SensitiveField(
                   label: 'Repetir a senha',

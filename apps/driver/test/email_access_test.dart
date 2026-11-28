@@ -132,10 +132,11 @@ void main() {
     await submit();
     expect(find.textContaining('Confira o token'), findsOneWidget);
     final fullToken = 'rec_${'a' * 64}';
+    var clipboard = fullToken;
     final messenger =
         TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
     messenger.setMockMethodCallHandler(SystemChannels.platform, (call) async {
-      if (call.method == 'Clipboard.getData') return {'text': fullToken};
+      if (call.method == 'Clipboard.getData') return {'text': clipboard};
       return null;
     });
     addTearDown(
@@ -147,11 +148,23 @@ void main() {
         .state<EditableTextState>(find.byType(EditableText).first)
         .pasteText(SelectionChangedCause.toolbar);
     await t.pump();
-    await t.enterText(find.byType(TextField).at(1), 'senha de teste fictícia');
+    clipboard = ' teste1 ';
+    await t.tap(find.byType(TextField).at(1));
+    await t.pump();
+    await t
+        .state<EditableTextState>(find.byType(EditableText).at(1))
+        .pasteText(SelectionChangedCause.toolbar);
+    await submit();
+    expect(find.text('A senha não pode conter espaços.'), findsOneWidget);
+    expect(
+      t.widget<TextField>(find.byType(TextField).at(1)).controller!.text,
+      clipboard,
+    );
+    await t.enterText(find.byType(TextField).at(1), 'senha123');
     await submit();
     expect(find.text('As senhas precisam coincidir.'), findsOneWidget);
     expect(api.resets, 0);
-    const senha = ' senha8 ';
+    const senha = 'senha888';
     await t.enterText(find.byType(TextField).at(1), senha);
     await t.enterText(find.byType(TextField).at(2), senha);
     final labels = [

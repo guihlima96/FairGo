@@ -56,11 +56,11 @@ void main() {
     await tap('Continuar');
     await enter(0, 'curta');
     await tap('Criar minha conta');
-    expect(find.textContaining('Use uma senha'), findsOneWidget);
-    await enter(0, ' teste1 ');
+    expect(find.textContaining('Utilize uma senha'), findsWidgets);
+    await enter(0, 'teste123');
     await tap('Criar minha conta');
     expect(find.textContaining('precisam coincidir'), findsOneWidget);
-    await enter(1, ' teste1 ');
+    await enter(1, 'teste123');
     final senha = find.byType(TextField).first;
     final repetir = find.byType(TextField).last;
     expect(t.widget<TextField>(senha).obscureText, isTrue);
@@ -73,7 +73,7 @@ void main() {
       await t.pump();
       expect(t.widget<TextField>(campo).obscureText, isFalse);
       expect(t.widget<TextField>(outro).obscureText, isTrue);
-      expect(t.widget<TextField>(campo).controller!.text, ' teste1 ');
+      expect(t.widget<TextField>(campo).controller!.text, 'teste123');
       await t.tap(find.byTooltip('Ocultar $label'));
       await t.pump();
     }
@@ -88,7 +88,7 @@ void main() {
       'email',
       'senha',
     });
-    expect(api.calls.single['senha'], ' teste1 ');
+    expect(api.calls.single['senha'], 'teste123');
     expect(api.calls.single['cpf'], '52998224725');
     expect(api.calls.single['celular'], '+5511912345678');
     expect(find.text('Conta criada'), findsNothing);

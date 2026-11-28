@@ -31,6 +31,10 @@ def api(metodo, rota, dados=None, token=None):
         return resposta.status, json.loads(corpo) if corpo else None
 
 
+SENHAS_COM_ESPACO = (" abcdefg", "abc defg", "abcdefg ", " " * 8, "abc\tdefg", "abc\ndefg",
+                    "abc\u0085defg", "abc\u00a0defg", "abc\u2009defg", "abc\u2028defg", "abc\ufeffdefg")
+
+
 def cadastro():
     numeros = [secrets.randbelow(10) for _ in range(9)]
     for peso in (10, 11):
@@ -105,12 +109,13 @@ class Driver(unittest.TestCase):
         dados = cadastro()
         for tamanho in (7, 33):
             self.assertEqual(api("POST", "/api/driver/contas", dict(dados, senha="x" * tamanho))[0], 400)
-        senha = " teste1 "
+        for valor in SENHAS_COM_ESPACO:
+            self.assertEqual(api("POST", "/api/driver/contas", dict(dados, senha=valor))[0], 400)
+        senha = "teste123"
         titular = self.criar(dict(dados, senha=senha))
         self.login(titular, senha)
-        self.login(titular, senha.strip(), 401)
         # Conta preexistente com hash no formato PBKDF2 do Driver.
-        legada = secrets.token_hex(32)
+        legada = " " + secrets.token_hex(32) + " "
         salt = secrets.token_bytes(16)
         digest = hashlib.pbkdf2_hmac("sha256", legada.encode(), salt, 600000)
         sql(f"UPDATE contas_driver SET senha_hash='{(salt + digest).hex()}' WHERE usuario_id='{titular}'")
@@ -264,7 +269,10 @@ class Driver(unittest.TestCase):
         for tamanho in (7, 33):
             self.assertEqual(api("POST", "/api/driver/recuperacao/confirmacao",
                                  dict(dados, novaSenha="x" * tamanho))[0], 400)
-        dados["novaSenha"] = " nova12 "
+        for valor in SENHAS_COM_ESPACO:
+            self.assertEqual(api("POST", "/api/driver/recuperacao/confirmacao",
+                                 dict(dados, novaSenha=valor))[0], 400)
+        dados["novaSenha"] = "nova1234"
         with concurrent.futures.ThreadPoolExecutor(2) as pool:
             self.assertEqual(sorted(pool.map(lambda _: confirmar(), range(2))), [204,400])
         self.assertEqual(confirmar(), 400)
