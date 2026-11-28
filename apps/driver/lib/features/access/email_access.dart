@@ -5,6 +5,8 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../core/driver_api.dart';
 import '../../shared/driver_mark.dart';
+import '../../shared/sensitive_field.dart';
+import 'driver_password.dart';
 
 class VerificationPanel extends StatefulWidget {
   const VerificationPanel({
@@ -175,10 +177,8 @@ class _RecoveryState extends State<RecoveryPage> {
           notice = 'Confira o token recebido por e-mail.';
           return;
         }
-        if (password.text.trim().isEmpty ||
-            password.text.length < 15 ||
-            password.text.length > 128) {
-          notice = 'Use uma senha de 15 a 128 caracteres.';
+        if (!validNewDriverPassword(password.text)) {
+          notice = driverPasswordHint;
           return;
         }
         if (password.text != confirmation.text) {
@@ -186,7 +186,12 @@ class _RecoveryState extends State<RecoveryPage> {
           return;
         }
         await widget.api.redefinir(token.text.trim(), password.text);
-        if (mounted) Navigator.pop(context, true);
+        if (mounted) {
+          token.clear();
+          password.clear();
+          confirmation.clear();
+          Navigator.pop(context, true);
+        }
       }
     } on DriverFailure catch (e) {
       notice = e.status == 400 || e.status == 429
@@ -207,20 +212,18 @@ class _RecoveryState extends State<RecoveryPage> {
     super.dispose();
   }
 
-  Widget field(String label, TextEditingController c, {bool secret = false}) =>
-      TextField(
-        key: ValueKey(label),
-        controller: c,
-        enabled: !busy,
-        obscureText: secret,
-        autocorrect: false,
-        enableSuggestions: false,
-        keyboardType: c == email ? TextInputType.emailAddress : null,
-        decoration: InputDecoration(
-          labelText: label,
-          border: const OutlineInputBorder(),
-        ),
-      );
+  Widget emailField() => TextField(
+    key: const ValueKey('E-mail cadastrado'),
+    controller: email,
+    enabled: !busy,
+    autocorrect: false,
+    enableSuggestions: false,
+    keyboardType: TextInputType.emailAddress,
+    decoration: const InputDecoration(
+      labelText: 'E-mail cadastrado',
+      border: OutlineInputBorder(),
+    ),
+  );
   @override
   Widget build(BuildContext context) => PopScope(
     canPop: !busy,
@@ -253,14 +256,30 @@ class _RecoveryState extends State<RecoveryPage> {
             ),
             const SizedBox(height: 16),
             if (!reset)
-              field('E-mail cadastrado', email)
+              emailField()
             else ...[
               const Text(
                 'Se o e-mail estiver elegível, você receberá instruções para recuperar o acesso.',
               ),
-              field('Token recebido por e-mail', token, secret: true),
-              field('Nova senha', password, secret: true),
-              field('Confirmar nova senha', confirmation, secret: true),
+              SensitiveField(
+                label: 'Token recebido por e-mail',
+                controller: token,
+                enabled: !busy,
+                border: const OutlineInputBorder(),
+              ),
+              SensitiveField(
+                label: 'Nova senha',
+                controller: password,
+                enabled: !busy,
+                border: const OutlineInputBorder(),
+                helperText: '8 a 32 caracteres',
+              ),
+              SensitiveField(
+                label: 'Repetir a senha',
+                controller: confirmation,
+                enabled: !busy,
+                border: const OutlineInputBorder(),
+              ),
             ],
             const SizedBox(height: 24),
             FilledButton(

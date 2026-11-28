@@ -22,11 +22,11 @@ import static org.springframework.http.HttpStatus.*;
 class ContaDriver {
     record Cadastro(@NotBlank @Size(max=160) String nome, @NotBlank @CPF String cpf,
                     @NotBlank @Pattern(regexp="(?:[+]55 ?)?(?:[(][1-9][0-9][)]|[1-9][0-9]) ?9[0-9]{4}-?[0-9]{4}") String celular,
-                    @NotBlank @Email @Size(max=254) String email, @NotBlank @Size(min=15,max=128) String senha) {}
+                    @NotBlank @Email @Size(max=254) String email, @NotBlank @Size(min=8,max=32) String senha) {}
     record Login(@NotBlank @Size(max=254) String identificador, @NotBlank @Size(max=128) String senha) {}
     record Pedido(@NotBlank @Email @Size(max=254) String email) {}
     record Redefinicao(@NotNull @Pattern(regexp="rec_[0-9a-f]{64}") String token,
-                       @NotBlank @Size(min=15,max=128) String novaSenha) {
+                       @NotBlank @Size(min=8,max=32) String novaSenha) {
         @Override public String toString() { return "Redefinicao[protegida]"; }
     }
     record Credencial(UUID id, String hash) {}

@@ -101,6 +101,21 @@ class Driver(unittest.TestCase):
         self.assertFalse(me["celularVerificado"] or me["nomeVerificado"])
         self.assertFalse(api("GET", "/api/driver/me", token=outro)[1]["emailVerificado"])
 
+    def test_senhas_limites_e_login_legado(self):
+        dados = cadastro()
+        for tamanho in (7, 33):
+            self.assertEqual(api("POST", "/api/driver/contas", dict(dados, senha="x" * tamanho))[0], 400)
+        senha = " teste1 "
+        titular = self.criar(dict(dados, senha=senha))
+        self.login(titular, senha)
+        self.login(titular, senha.strip(), 401)
+        # Conta preexistente com hash no formato PBKDF2 do Driver.
+        legada = secrets.token_hex(32)
+        salt = secrets.token_bytes(16)
+        digest = hashlib.pbkdf2_hmac("sha256", legada.encode(), salt, 600000)
+        sql(f"UPDATE contas_driver SET senha_hash='{(salt + digest).hex()}' WHERE usuario_id='{titular}'")
+        self.login(titular, legada)
+
     def test_contas(self):
         a, b = cadastro(), cadastro()
         for campo, invalido in (("cpf", "00000000000"), ("celular", "123"), ("senha", "curta"), ("nome", "")):
@@ -246,12 +261,26 @@ class Driver(unittest.TestCase):
         sql(f"UPDATE recuperacoes_driver SET expira_em=now() WHERE digest='{digest}'")
         self.assertEqual(confirmar(), 400)
         sql(f"UPDATE recuperacoes_driver SET expira_em=now()+interval '1 hour' WHERE digest='{digest}'")
+        for tamanho in (7, 33):
+            self.assertEqual(api("POST", "/api/driver/recuperacao/confirmacao",
+                                 dict(dados, novaSenha="x" * tamanho))[0], 400)
+        dados["novaSenha"] = " nova12 "
         with concurrent.futures.ThreadPoolExecutor(2) as pool:
             self.assertEqual(sorted(pool.map(lambda _: confirmar(), range(2))), [204,400])
         self.assertEqual(confirmar(), 400)
         self.assertEqual(api("GET", "/api/driver/me", token=sessao)[0], 401)
         self.login(usuario, a["senha"], 401)
         self.login(usuario, dados["novaSenha"])
+        # Outro token de uso único permite conferir também o limite superior aceito.
+        token32 = "rec_" + secrets.token_hex(32)
+        digest32 = hashlib.sha256(token32.encode()).hexdigest()
+        vinculo32 = hashlib.sha256("\n".join((usuario, a["email"], token32)).encode()).hexdigest()
+        sql(f"""INSERT INTO recuperacoes_driver(digest,usuario_id,expira_em,vinculo)
+                VALUES ('{digest32}','{usuario}',now()+interval '1 hour','{vinculo32}')""")
+        longa = secrets.token_hex(16)
+        self.assertEqual(api("POST", "/api/driver/recuperacao/confirmacao",
+                             {"token": token32, "novaSenha": longa})[0], 204)
+        self.login(usuario, longa)
         self.assertEqual(api("GET", "/api/driver/me", token=sessao_alheia)[0], 200)
         self.login(outro, b["senha"])
         # Solicitações públicas, inclusive simultâneas para contato verificado, continuam sem emissão.

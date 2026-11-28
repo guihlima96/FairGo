@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:fairgo_driver/core/driver_api.dart';
 
 import 'package:fairgo_driver/features/access/email_access.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -11,6 +12,7 @@ import 'login_test.dart' show FakeApi;
 class EmailApi extends FakeApi {
   final pendingCode = Completer<String>();
   int requests = 0, resets = 0, confirmations = 0;
+  String? receivedToken, receivedPassword;
   DriverFailure? failure;
   @override
   Future<String> solicitarCodigo(String token) {
@@ -33,6 +35,8 @@ class EmailApi extends FakeApi {
   Future<void> recuperar(String email) async {}
   @override
   Future<void> redefinir(String token, String senha) async {
+    receivedToken = token;
+    receivedPassword = senha;
     resets++;
   }
 }
@@ -127,10 +131,49 @@ void main() {
 
     await submit();
     expect(find.textContaining('Confira o token'), findsOneWidget);
-    await t.enterText(find.byType(TextField).first, 'rec_${'a' * 64}');
+    final fullToken = 'rec_${'a' * 64}';
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(SystemChannels.platform, (call) async {
+      if (call.method == 'Clipboard.getData') return {'text': fullToken};
+      return null;
+    });
+    addTearDown(
+      () => messenger.setMockMethodCallHandler(SystemChannels.platform, null),
+    );
+    await t.tap(find.byType(TextField).first);
+    await t.pump();
+    await t
+        .state<EditableTextState>(find.byType(EditableText).first)
+        .pasteText(SelectionChangedCause.toolbar);
+    await t.pump();
     await t.enterText(find.byType(TextField).at(1), 'senha de teste fictícia');
     await submit();
     expect(find.text('As senhas precisam coincidir.'), findsOneWidget);
     expect(api.resets, 0);
+    const senha = ' senha8 ';
+    await t.enterText(find.byType(TextField).at(1), senha);
+    await t.enterText(find.byType(TextField).at(2), senha);
+    final labels = [
+      'token recebido por e-mail',
+      'nova senha',
+      'repetir a senha',
+    ];
+    for (var i = 0; i < labels.length; i++) {
+      final show = find.byTooltip('Mostrar ${labels[i]}');
+      await t.ensureVisible(show);
+      await t.tap(show);
+      await t.pump();
+      for (var j = 0; j < labels.length; j++) {
+        final field = t.widget<TextField>(find.byType(TextField).at(j));
+        expect(field.obscureText, j != i);
+        expect(field.controller!.text, j == 0 ? fullToken : senha);
+      }
+      await t.tap(find.byTooltip('Ocultar ${labels[i]}'));
+      await t.pump();
+    }
+    await submit();
+    expect(api.receivedToken, fullToken);
+    expect(api.receivedPassword, senha);
   });
 }

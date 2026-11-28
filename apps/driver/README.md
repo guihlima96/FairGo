@@ -49,3 +49,12 @@ O workflow Flutter testa as configurações de origem, a tela inicial, as duas r
 ## Homologação interna do cadastro no Galaxy S10e
 
 Com o backend de homologação em loopback, configure o túnel e execute o app com os comandos USB acima. Toque em Criar conta. Use celular, CPF válido de teste, nome, e-mail e senha fictícios em base isolada. Volte uma etapa e confira os dados. Após confirmar a senha, toque uma vez em Criar minha conta. Confira o número retornado, siga para o login e autentique pelo número. Repita os dados para conferir o conflito genérico. Em uma nova tentativa, interrompa o túnel e confira a mensagem de resultado incerto. Verifique a conta antes de repetir.
+
+### Homologação da PR #30 no Galaxy S10e
+
+Com o backend e o APK desta revisão, use dados fictícios e o túnel USB descrito acima.
+
+1. Digite um CPF válido, cole com e sem pontuação e tente um 12º dígito. Corrija um dígito no meio e apague junto a um ponto. Confira o cursor, a apresentação XXX.XXX.XXX-XX e a rejeição de um verificador inválido.
+2. No cadastro, tente senhas de 7, 8, 32 e 33 caracteres e uma confirmação divergente. Confira os olhos dos dois campos e teste uma senha com espaços nas extremidades. Volte da etapa de senha e confira que ambos os campos estão vazios e ocultos ao retornar.
+3. Entre com uma conta legada cuja senha tenha mais de 32 caracteres. No fluxo interno de recuperação por e-mail, cole o token integral, alterne os três olhos individualmente e redefina a senha. Confira que a sessão anterior é revogada, a nova senha permite login e o logout encerra a sessão.
+4. Confira a verificação de e-mail e a legibilidade em retrato e paisagem. Não inclua CPF, senha, token ou conteúdo do e-mail em capturas ou registros de homologação.

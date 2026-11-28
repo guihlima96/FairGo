@@ -2,6 +2,8 @@ import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../core/driver_api.dart';
+import '../../shared/sensitive_field.dart';
+import 'driver_password.dart';
 
 class DigitMask extends TextInputFormatter {
   DigitMask(this.pattern);
@@ -11,26 +13,61 @@ class DigitMask extends TextInputFormatter {
     TextEditingValue oldValue,
     TextEditingValue newValue,
   ) {
-    final digits = newValue.text.replaceAll(RegExp(r'\D'), '');
-    final before = newValue.selection.end.clamp(0, newValue.text.length);
-    final left = newValue.text
-        .substring(0, before)
-        .replaceAll(RegExp(r'\D'), '')
-        .length;
+    if (oldValue.text == newValue.text) return newValue;
+    final separators = RegExp(r'\D');
+    var raw = newValue.text;
+    var selection = newValue.selection;
+    // Backspace/Delete on punctuation must also remove the adjacent digit.
+    if (oldValue.selection.isValid &&
+        oldValue.selection.isCollapsed &&
+        selection.isCollapsed &&
+        selection.isValid &&
+        raw.length + 1 == oldValue.text.length &&
+        raw.replaceAll(separators, '') ==
+            oldValue.text.replaceAll(separators, '')) {
+      final caret = selection.extentOffset;
+      final backward = oldValue.selection.extentOffset > caret;
+      var index = backward ? caret - 1 : caret;
+      while (index >= 0 &&
+          index < raw.length &&
+          separators.hasMatch(raw[index])) {
+        index += backward ? -1 : 1;
+      }
+      if (index >= 0 && index < raw.length) {
+        raw = raw.replaceRange(index, index + 1, '');
+        selection = TextSelection.collapsed(offset: backward ? index : caret);
+      }
+    }
+    final digits = raw.replaceAll(separators, '');
     final out = StringBuffer();
-    var i = 0, cursor = 0;
+    final offsets = [0];
+    var i = 0;
     for (final char in pattern.split('')) {
       if (i == digits.length) break;
       if (char == '#') {
         out.write(digits[i++]);
+        offsets.add(out.length);
       } else {
         out.write(char);
       }
-      if (i <= left) cursor = out.length;
     }
+    int offset(int position) {
+      if (position < 0) return out.length;
+      final left = raw
+          .substring(0, position.clamp(0, raw.length))
+          .replaceAll(separators, '')
+          .length;
+      return offsets[left.clamp(0, i)];
+    }
+
     return TextEditingValue(
       text: out.toString(),
-      selection: TextSelection.collapsed(offset: cursor),
+      selection: TextSelection(
+        baseOffset: offset(selection.baseOffset),
+        extentOffset: offset(selection.extentOffset),
+        affinity: selection.affinity,
+        isDirectional: selection.isDirectional,
+      ),
     );
   }
 }
@@ -100,10 +137,8 @@ class _SignupState extends State<SignupPage> {
           return 'Confira o e-mail.';
         }
       case 3:
-        if (password.text.trim().isEmpty ||
-            password.text.length < 15 ||
-            password.text.length > 128) {
-          return 'Use uma senha de 15 a 128 caracteres.';
+        if (!validNewDriverPassword(password.text)) {
+          return driverPasswordHint;
         }
         if (password.text != confirmation.text) {
           return 'As senhas precisam coincidir.';
@@ -118,6 +153,10 @@ class _SignupState extends State<SignupPage> {
       Navigator.pop(context);
     } else {
       setState(() {
+        if (step == 3) {
+          password.clear();
+          confirmation.clear();
+        }
         step--;
         error = null;
       });
@@ -160,12 +199,10 @@ class _SignupState extends State<SignupPage> {
     TextEditingController controller, {
     String? mask,
     TextInputType? type,
-    bool secret = false,
   }) => TextField(
     key: ValueKey(label),
     controller: controller,
     enabled: !busy,
-    obscureText: secret,
     autocorrect: false,
     enableSuggestions: false,
     keyboardType: type,
@@ -224,14 +261,23 @@ class _SignupState extends State<SignupPage> {
                   'CPF',
                   cpf,
                   mask: '###.###.###-##',
-                  type: TextInputType.number,
+                  type: TextInputType.phone,
                 ),
               ],
               if (step == 2)
                 field('E-mail', email, type: TextInputType.emailAddress),
               if (step == 3) ...[
-                field('Senha (15 a 128 caracteres)', password, secret: true),
-                field('Confirmar senha', confirmation, secret: true),
+                SensitiveField(
+                  label: 'Nova senha',
+                  controller: password,
+                  enabled: !busy,
+                  helperText: '8 a 32 caracteres',
+                ),
+                SensitiveField(
+                  label: 'Repetir a senha',
+                  controller: confirmation,
+                  enabled: !busy,
+                ),
               ],
               if (error != null)
                 Semantics(liveRegion: true, child: Text(error!)),
