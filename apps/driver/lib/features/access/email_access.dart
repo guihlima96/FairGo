@@ -222,48 +222,67 @@ class _RecoveryState extends State<RecoveryPage> {
         ),
       );
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('FairGO Driver')),
-    body: SafeArea(
-      child: ListView(
-        padding: const EdgeInsets.all(24),
-        children: [
-          const Center(child: DriverMark()),
-          const SizedBox(height: 24),
-          Text(
-            'Recuperar acesso',
-            style: Theme.of(context).textTheme.titleLarge,
+  Widget build(BuildContext context) => PopScope(
+    canPop: !busy,
+    child: Scaffold(
+      appBar: AppBar(
+        title: Text.rich(
+          TextSpan(
+            text: 'Fair',
+            children: [
+              TextSpan(
+                text: 'GO Driver',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.primary,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 16),
-          if (!reset)
-            field('E-mail cadastrado', email)
-          else ...[
-            const Text(
-              'Se o e-mail estiver elegível, você receberá instruções para recuperar o acesso.',
+        ),
+      ),
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.all(24),
+          children: [
+            const Center(child: DriverMark()),
+            const SizedBox(height: 24),
+            Text(
+              'Recuperar acesso',
+              style: Theme.of(context).textTheme.titleLarge,
             ),
-            field('Token recebido por e-mail', token, secret: true),
-            field('Nova senha', password, secret: true),
-            field('Confirmar nova senha', confirmation, secret: true),
+            const SizedBox(height: 16),
+            if (!reset)
+              field('E-mail cadastrado', email)
+            else ...[
+              const Text(
+                'Se o e-mail estiver elegível, você receberá instruções para recuperar o acesso.',
+              ),
+              field('Token recebido por e-mail', token, secret: true),
+              field('Nova senha', password, secret: true),
+              field('Confirmar nova senha', confirmation, secret: true),
+            ],
+            const SizedBox(height: 24),
+            FilledButton(
+              onPressed: busy ? null : submit,
+              child: Text(reset ? 'Redefinir senha' : 'Solicitar instruções'),
+            ),
+            if (!reset)
+              TextButton(
+                onPressed: busy
+                    ? null
+                    : () => setState(() {
+                        reset = true;
+                        notice = null;
+                        email.clear();
+                      }),
+                child: const Text('Já tenho o token'),
+              ),
+            if (busy) const LinearProgressIndicator(),
+            if (notice != null)
+              Semantics(liveRegion: true, child: Text(notice!)),
           ],
-          const SizedBox(height: 24),
-          FilledButton(
-            onPressed: busy ? null : submit,
-            child: Text(reset ? 'Redefinir senha' : 'Solicitar instruções'),
-          ),
-          if (!reset)
-            TextButton(
-              onPressed: busy
-                  ? null
-                  : () => setState(() {
-                      reset = true;
-                      notice = null;
-                      email.clear();
-                    }),
-              child: const Text('Já tenho o token'),
-            ),
-          if (busy) const LinearProgressIndicator(),
-          if (notice != null) Semantics(liveRegion: true, child: Text(notice!)),
-        ],
+        ),
       ),
     ),
   );

@@ -11,9 +11,11 @@ import 'login_test.dart' show FakeApi;
 class EmailApi extends FakeApi {
   final pendingCode = Completer<String>();
   int requests = 0, resets = 0, confirmations = 0;
+  DriverFailure? failure;
   @override
   Future<String> solicitarCodigo(String token) {
     requests++;
+    if (failure != null) return Future.error(failure!);
     return pendingCode.future;
   }
 
@@ -36,6 +38,37 @@ class EmailApi extends FakeApi {
 }
 
 void main() {
+  for (final status in [401, 409, 503]) {
+    testWidgets('solicitação HTTP $status consulta perfil ou encerra sessão', (
+      t,
+    ) async {
+      final api = EmailApi()
+        ..failure = DriverFailure('Falha controlada', status);
+      var reads = 0, expired = 0;
+      await t.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: VerificationPanel(
+              api: api,
+              token: 'fixture',
+              refresh: () async {
+                reads++;
+              },
+              expired: () async {
+                expired++;
+              },
+            ),
+          ),
+        ),
+      );
+      await t.tap(find.text('Verificar e-mail'));
+      await t.pump();
+      expect(reads, status == 401 ? 0 : 1);
+      expect(expired, status == 401 ? 1 : 0);
+      expect(api.requests, 1);
+      await t.pumpWidget(const SizedBox());
+    });
+  }
   testWidgets('um envio, contador, confirmação seguida de consulta', (t) async {
     final api = EmailApi();
     int reads = 0;

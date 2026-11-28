@@ -215,8 +215,8 @@ class _LoginPageState extends State<LoginPage> with WidgetsBindingObserver {
                             if (saved != null) {
                               try {
                                 await widget.api.perfil(saved.token);
-                              } on DriverFailure catch (e) {
-                                if (e.status == 401) await forget();
+                              } on DriverFailure {
+                                await forget();
                               }
                             }
                             notice =
